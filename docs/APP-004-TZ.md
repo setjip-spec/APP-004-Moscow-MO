@@ -1,5 +1,5 @@
 # APP-004 — Москва и МО — ТЗ
-## DRAFT v0.7 — source intake / UI agreement
+## DRAFT v0.8 — source intake / UI agreement
 
 **Статус:** ТЗ В РАБОТЕ  
 **Дата:** 25.09.2026  
@@ -101,7 +101,7 @@ History — отдельный экран.
 - поиск по эмоциям и атрибутам атмосферы обязателен для Favorite и Research;
 - сортировка и расширенные фильтры реализуются в полном Search / Results, а не перегружают Dashboard.
 
-Дальнейший визуальный этап: **Settings**.
+Визуальный этап: **ЗАВЕРШЁН / APPROVED**.
 
 ### Desktop Search / Results — утверждён 25.09.2026
 
@@ -197,6 +197,39 @@ https://drive.google.com/file/d/1Y_XsM-wuLun_muwZ0BM86esFvMK5Qh_V/view?usp=drive
 - карточки остаются компактными и содержат thumbnail, цену, время и ключевой контекст;
 - погода сохраняет сегодня + недельный прогноз;
 - Search / Results остаётся контекстным экраном, а не отдельной постоянной вкладкой.
+
+### Desktop Settings — утверждён 25.09.2026
+
+Reference:
+https://drive.google.com/file/d/14Z0ir3ptjyUi9vVGQqqx2Ra4_7JVTVKp/view?usp=drivesdk
+
+Зафиксировано:
+- Settings остаётся пользовательской страницей, а не технической админкой;
+- слева — категории настроек;
+- центр — основные настройки;
+- справа — Account / My Data / Support / About;
+- бюджет на досуг — обязательная ключевая настройка;
+- новое значение бюджета действует с выбранного месяца и не переписывает прошлые месяцы;
+- Search defaults: источники, период событий, последний запрос и фильтры;
+- Location & Road: базовая точка, рабочая область, предпочитаемый транспорт;
+- Weather: город и отображение погодного блока;
+- Interface: плотность, формат выдачи, изображения, эмоциональные шкалы и атмосферные теги;
+- Account показывает только пользовательские понятные состояния синхронизации;
+- технические поля Supabase / API / RLS / schema / backend не показываются.
+
+### Visual/UI stage — завершён
+
+Утверждены:
+1. Desktop Dashboard
+2. Search / Results
+3. Desktop History
+4. Universal Detail Card
+5. Mobile Dashboard
+6. Desktop Settings
+
+Все approved references находятся в Google Drive `03_UI_REFERENCE/APPROVED`.
+
+Следующий этап — не визуальный. Нужно разрешить source mismatch по TECH и только после этого фиксировать финальную Supabase-схему и backend parity.
 
 ### Правило визуальных итераций
 
