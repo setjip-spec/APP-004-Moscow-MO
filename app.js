@@ -521,12 +521,27 @@ function resultRow(item,type,index){
 }
 
 function historySearchPanel(){
-  return '<section class="search-panel"><div class="search-top"><div class="search-wrap">'+icon("search")+'<form id="history-search-form"><input class="global-search" id="history-search" placeholder="Поиск по посещениям..." value="'+e(state.searchText)+'"></form></div>'+
-  '<div class="toolbar-right"><select class="select"><option>За всё время</option><option>Этот год</option><option>Последние 3 месяца</option></select><button class="chip-btn">2026</button><button class="chip-btn">2025</button></div></div></section>';
+  return '<section class="search-panel history-search-panel"><div class="history-search-top"><div class="search-wrap">'+icon("search")+'<form id="history-search-form"><input class="global-search" id="history-search" placeholder="Поиск по посещениям: место, район, событие, заметка..." value="'+e(state.searchText)+'"></form><div class="search-hint">Например: Парк Горького, выставка, ужин, Красногорск</div></div>'+
+    '<div class="history-period"><b>Период</b><select class="select"><option>За всё время</option><option>Этот год</option><option>Последние 3 месяца</option></select></div>'+
+    '<div class="history-years"><b>Быстрые фильтры:</b><div><button class="chip-btn active">Все</button><button class="chip-btn">2026</button><button class="chip-btn">2025</button><button class="chip-btn">2024</button><button class="chip-btn">2023</button></div></div></div>'+
+    '<div class="history-search-bottom"><div class="history-active"><b>Активные фильтры:</b><span class="active-chip">Вместе ×</span><span class="active-chip">Вечер ×</span><span class="active-chip">Повторить: Да ×</span></div><div class="toolbar-right"><button class="outline-btn">⇅ Сортировка: Дата ↓</button><button class="outline-btn">▥ Колонки</button></div></div></section>';
+}
+function historyFilterMarkup(){
+  return '<aside class="panel filter-panel history-filter"><div class="panel-head"><div class="panel-title-wrap"><span class="panel-icon blue">'+icon("filter")+'</span><div class="panel-title">Фильтры истории</div></div><button class="link-btn">Сбросить всё</button></div>'+
+    filterSection("▣ Период",'<select class="select filter-select"><option>За всё время</option></select>')+
+    filterSection("♙ С кем был(и)",'<div class="segment"><button class="active">Любой</button><button>Один</button><button>Вместе</button></div>')+
+    filterSection("◷ Время посещения",'<div class="segment"><button class="active">Любое</button><button>День</button><button>Вечер</button></div>')+
+    filterSection("⌖ Район / город",'<select class="select filter-select"><option>Любой район / город</option></select>')+
+    filterSection("☺ Главное состояние",'<select class="select filter-select"><option>Любое состояние</option></select>')+
+    filterSection("★ Оценка",'<div class="rating-segment"><button class="active">Любая</button><button>5</button><button>4</button><button>3</button><button>2</button><button>1</button></div>')+
+    filterSection("↻ Повторить посещение",'<div class="segment"><button class="active">Любой</button><button>Да</button><button>Нет</button></div>')+
+    filterSection("₽ Стоимость Visit",'<div class="range-row"><input placeholder="от 0 ₽"><input placeholder="до 10 000 ₽"></div>')+
+    filterSection("♡ Эмоциональные состояния",'<select class="select filter-select"><option>Любое состояние</option></select>')+
+    '<div class="history-filter-action"><button class="action-primary">'+icon("search")+' Показать результаты</button><div class="panel-sub">Найдено '+e(state.visits.length)+' посещений</div></div></aside>';
 }
 function renderHistory(){
   const q=state.searchText.trim().toLowerCase();
-  const visits=state.visits.filter(v=>!q||[v.place_route_name,v.main_state,v.conclusion,v.repeat_verdict].filter(Boolean).join(" ").toLowerCase().includes(q));
+  const visits=state.visits.filter(v=>!q||[v.place_route_name,v.main_state,v.conclusion,v.repeat_verdict,v.what_worked,v.what_failed].filter(Boolean).join(" ").toLowerCase().includes(q));
   const groups=new Map();
   for(const v of visits){
     const key=v.visit_date?new Intl.DateTimeFormat("ru-RU",{timeZone:"Europe/Moscow",month:"long",year:"numeric"}).format(new Date(v.visit_date+"T12:00:00+03:00")):"Дата не указана";
@@ -534,22 +549,34 @@ function renderHistory(){
   }
   let body="";
   for(const [month,arr] of groups){
-    body+='<section class="month-group"><div class="month-title">'+e(month)+'</div>'+arr.map(visitRow).join("")+'</section>';
+    const spent=arr.reduce((s,v)=>s+n(v.visit_total),0);
+    body+='<section class="month-group"><div class="month-title"><span>'+e(month)+'</span><small>'+arr.length+' посещения'+(spent?(' • Потрачено '+money(spent)):'')+'</small><span>⌃</span></div>'+arr.map(visitRow).join("")+'</section>';
   }
-  const view='<div>'+historySearchPanel()+'<div class="history-shell"><aside class="panel filter-panel"><div class="panel-head"><div class="panel-title">Фильтры истории</div></div>'+
-    filterSection("Контекст",'<label class="check"><input type="checkbox"> Один</label><label class="check"><input type="checkbox"> Вместе</label><label class="check"><input type="checkbox"> День</label><label class="check"><input type="checkbox"> Вечер</label>')+
-    filterSection("Повторить?",'<label class="check"><input type="checkbox"> Да</label><label class="check"><input type="checkbox"> Нет</label>')+
-    '</aside><section class="panel history-main"><div class="history-toolbar"><b>История посещений</b><div class="toolbar-right"><select class="select"><option>Сначала новые</option><option>По рейтингу</option></select><button class="chip-btn">Колонки</button></div></div>'+
-    (body||'<div class="empty-state">Посещений не найдено.</div>')+'</section></div></div>';
+  const view='<div>'+historySearchPanel()+'<div class="history-shell">'+historyFilterMarkup()+
+    '<section class="panel history-main">'+(body||'<div class="empty-state">Посещений не найдено.</div>')+'</section></div></div>';
   shell(view,"history",false);
 }
 function visitRow(v){
   const expanded=state.historyExpanded===v.id;
-  return '<div><article class="visit-row"><span class="visit-date">'+e(v.visit_date?fmtDate(v.visit_date,{day:"2-digit",month:"2-digit",year:"numeric"}):"—")+'</span><span class="badge blue">'+e(v.time_of_day||"—")+'</span><div class="visit-place"><div class="visit-title">'+e(v.place_route_name||"Без названия")+'</div><div class="meta-line">'+e(v.conclusion||"")+'</div></div><span class="rating">'+(v.rating?"★ "+e(v.rating):"—")+'</span><span>'+e(v.main_state||"—")+'</span><span>'+e(v.companions||"—")+'</span><b>'+e(money(v.visit_total))+'</b><button class="expand-btn visit-action" data-expand-visit="'+e(v.id)+'">'+(expanded?"⌃":"⌄")+'</button></article>'+
-    (expanded?visitDetail(v):"")+'</div>';
+  let day="—",month="",week="";
+  if(v.visit_date){
+    const d=new Date(v.visit_date+"T12:00:00+03:00");
+    day=new Intl.DateTimeFormat("ru-RU",{timeZone:"Europe/Moscow",day:"2-digit"}).format(d);
+    month=new Intl.DateTimeFormat("ru-RU",{timeZone:"Europe/Moscow",month:"long"}).format(d);
+    week=new Intl.DateTimeFormat("ru-RU",{timeZone:"Europe/Moscow",weekday:"short"}).format(d);
+  }
+  const together=String(v.companions||"").toLowerCase().includes("один")?"Один":"Вместе";
+  const repeat=String(v.repeat_verdict||"").toLowerCase().startsWith("нет")?"Нет":"Да";
+  return '<div><article class="visit-row">'+
+    '<div class="visit-date-tile visit-date"><b>'+e(day)+'</b><span>'+e(month)+'</span><small>'+e(week)+'</small></div>'+
+    '<div class="visit-place"><img src="'+e(safeImg(v.cover_url))+'" alt="" onerror="this.src=\''+FALLBACK_IMAGE+'\'"><div><div class="visit-title">'+e(v.place_route_name||"Без названия")+'</div><div class="meta-line">'+e(v.evidence_scope||v.fact_source||"Посещение")+'</div><div class="meta-line">'+icon("clock")+e(v.time_of_day||"Время не указано")+'</div></div></div>'+
+    '<span class="badge blue">'+e(together)+'</span><span class="badge violet">'+e(v.time_of_day||"—")+'</span><span class="rating">'+(v.rating?"★ "+e(v.rating):"—")+'</span><span class="badge '+(v.main_state?"green":"gray")+'">'+e(v.main_state||"—")+'</span><b>'+e(money(v.visit_total))+'</b><span class="badge '+(repeat==="Да"?"green":"red")+'">↻ '+repeat+'</span><span class="visit-note">'+e(v.conclusion||v.what_worked||"")+'</span><button class="expand-btn visit-action" data-expand-visit="'+e(v.id)+'">'+(expanded?"⌃":"›")+'</button>'+
+    '</article>'+(expanded?visitDetail(v):"")+'</div>';
 }
 function visitDetail(v){
-  return '<div class="visit-detail"><img src="'+e(safeImg(v.cover_url))+'" alt="" onerror="this.src=\''+FALLBACK_IMAGE+'\'"><div><h3>'+e(v.place_route_name||"Посещение")+'</h3><p><b>Что сработало:</b> '+e(v.what_worked||"Нет записи")+'</p><p><b>Что не сработало:</b> '+e(v.what_failed||"Нет записи")+'</p><p><b>Вывод:</b> '+e(v.conclusion||"Нет записи")+'</p></div><div><h3>Фактические расходы</h3><p>Активность: <b>'+e(money(v.activity_cost))+'</b></p><p>Общественный транспорт: <b>'+e(money(v.public_transport_cost))+'</b></p><p>Такси: <b>'+e(money(v.taxi_cost))+'</b></p><p>Всего: <b>'+e(money(v.visit_total))+'</b></p></div></div>';
+  const img=e(safeImg(v.cover_url));
+  return '<div class="visit-detail"><div class="visit-gallery-detail"><div class="visit-gallery-copy"><img class="visit-main-img" src="'+img+'" alt="" onerror="this.src=\''+FALLBACK_IMAGE+'\'"><div><h3>'+e(v.place_route_name||"Посещение")+'</h3><p>'+e(v.what_worked||v.conclusion||"Описание посещения не заполнено.")+'</p></div></div><div class="visit-gallery-thumbs">'+[0,1,2,3].map(()=>'<img src="'+img+'" alt="" onerror="this.src=\''+FALLBACK_IMAGE+'\'">').join("")+'</div></div>'+
+    '<div class="visit-cost-card"><h3>Расходы на посещение</h3><div><span>🎟 Билет / активность</span><b>'+e(money(v.activity_cost))+'</b></div><div><span>🚌 Общественный транспорт</span><b>'+e(money(v.public_transport_cost))+'</b></div><div><span>🚕 Такси</span><b>'+e(money(v.taxi_cost))+'</b></div><div><span>🛣 Дорога всего</span><b>'+e(money(v.road_total))+'</b></div><strong><span>Сумма Visit</span><b>'+e(money(v.visit_total))+'</b></strong></div></div>';
 }
 
 function findItem(type,id){
