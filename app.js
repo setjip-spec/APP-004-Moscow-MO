@@ -662,7 +662,9 @@ function sourceSetting(key,label){
 function renderSettings(){
   const s=state.settings||{}, amount=state.budgetVersion?.monthly_amount??"";
   const currentAmount=state.budget?.allocation_amount??state.budgetVersion?.monthly_amount??null;
-  const effective=(state.budgetVersion?.effective_month||isoMonthNow()).slice(0,7);
+  const currentMonth=isoMonthNow().slice(0,7);
+  const versionMonth=state.budgetVersion?.effective_month?.slice(0,7)||currentMonth;
+  const effective=versionMonth>=currentMonth?versionMonth:currentMonth;
   const view='<div class="settings-layout">'+
     '<aside class="settings-menu">'+
       settingsMenuItem("⚙","Основные настройки","Бюджет, поиск, общий режим",true)+
@@ -734,11 +736,17 @@ async function saveSettings(form){
   const {error}=await supabase.from("app004_settings").update(patch).eq("user_id",state.session.user.id);
   if(error){ toast("Не удалось сохранить настройки: "+error.message,true); return; }
   const budgetRaw=String(fd.get("budget_amount")||"").trim();
+  const currentBudget=state.budget?.allocation_amount??state.budgetVersion?.monthly_amount??null;
   if(budgetRaw!==""){
-    const amount=Number(budgetRaw), month=String(fd.get("budget_month")||"").trim()+"-01";
-    const {error:be}=await supabase.rpc("app004_set_budget_version",{p_effective_month:month,p_monthly_amount:amount,p_comment:"Из настроек APP-004"});
-    if(be){ toast("Настройки сохранены, но бюджет не обновлён: "+be.message,true); await loadAll(); renderSettings(); return; }
-    await supabase.rpc("app004_recalculate_budget_month",{p_month:month});
+    const amount=Number(budgetRaw);
+    if(currentBudget===null || Number(currentBudget)!==amount){
+      const monthBase=String(fd.get("budget_month")||"").trim();
+      if(!monthBase){ toast("Выберите месяц начала нового бюджета.",true); return; }
+      const month=monthBase+"-01";
+      const {error:be}=await supabase.rpc("app004_set_budget_version",{p_effective_month:month,p_monthly_amount:amount,p_comment:"Из настроек APP-004"});
+      if(be){ toast("Настройки сохранены, но бюджет не обновлён: "+be.message,true); await loadAll(); renderSettings(); return; }
+      await supabase.rpc("app004_recalculate_budget_month",{p_month:month});
+    }
   }
   toast("Настройки сохранены.");
   await loadAll(); renderSettings();
