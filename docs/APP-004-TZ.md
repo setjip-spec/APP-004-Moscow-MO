@@ -1,5 +1,5 @@
 # APP-004 — Москва и МО — ТЗ
-## DRAFT v0.8 — source intake / UI agreement
+## DRAFT v0.9 — backend foundation
 
 **Статус:** ТЗ В РАБОТЕ  
 **Дата:** 25.09.2026  
@@ -241,12 +241,34 @@ https://drive.google.com/file/d/14Z0ir3ptjyUi9vVGQqqx2Ra4_7JVTVKp/view?usp=drive
   https://drive.google.com/file/d/1rMwv0gL9Xi5CMfGMBKRDJKvrU_uFzetQ/view?usp=drivesdk
 - Визуальный чат не должен менять уже утверждённые части интерфейса, если задача касается только нового экрана.
 
+## Backend foundation — 25.09.2026
+
+Fresh canon verified. Core Supabase schema v1 applied to MINI-APPS-CLOUD with RLS.
+
+Created relational layers:
+- Settings / Media;
+- Sectors / Sources / Places / Routes;
+- Experiences / Research / Research evaluations / Evidence;
+- Event Series / Event Occurrences / Deals;
+- Visits;
+- Budget versions / monthly snapshots / Accounting transactions;
+- Commitments / commitment components;
+- Shared Expenses / Receivables;
+- Payables to People.
+
+Detailed mapping: `docs/DATA-MODEL.md`.
+
 ## Следующий технический шаг
 
-1. Получить свежие `Stage7 PAYABLES + APP READINESS USER.xlsx` и `Stage7 PAYABLES + APP READINESS TECH.xlsx`.
-2. Заменить старые source-файлы в APP-004 и обновить Google BACKUP SAFE.
-3. Прочитать свежий TECH полностью, включая модули 41–45, APP-061–086 и App Readiness Gate.
-4. Составить финальный entity map / enums / FK / unique constraints / indexes / transactional RPC.
-5. Сверить сущности с APP requirements и QA matrix.
-6. После этого применять Supabase migrations и начинать backend.
-7. QA-014 Research → Visit остаётся live SOAK и не блокирует шаги 4–6.
+1. Import canonical source data into APP-004 tables.
+2. Implement transactional RPCs matching APP requirements and QA:
+   - Research → Visit;
+   - Visit/accounting posting;
+   - refunds/corrections;
+   - commitments / partial payments / deposits;
+   - shared reimbursements;
+   - payables / repayments.
+3. Add runtime media path and weather/event integrations.
+4. Build GitHub Pages frontend against approved visual-kit.
+5. Run parity/integration QA.
+6. QA-014 remains the final real-world soak before full release.
