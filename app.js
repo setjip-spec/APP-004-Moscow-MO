@@ -615,7 +615,10 @@ function emotionFilterVisual(){
 }
 function atmosphereFilterVisual(){
   const defs=[["💧","Вода","water"],["♣","Зелень","greenery"],["▣","Огни","lights"],["♫","Музыка","music"],["♨","Фонтаны","fountains"],["◫","Простор","panorama"],["☾","Спокойствие","calm"],["⚒","Архитектура","architecture"]];
-  return '<div class="atmo-grid">'+defs.map(([ic,label,key])=>'<button type="button" data-atmos-filter="'+e(key)+'" class="'+(state.filters.atmosphere[key]?"active":"")+'" title="'+(key==="architecture"?"По тегу; числовой шкалы в каноне нет":"По существующей канонической шкале")+'">'+ic+' '+e(label)+'</button>').join("")+'</div>';
+  return '<div class="atmo-grid">'+defs.map(([ic,label,key])=>{
+    if(key==="architecture") return '<button type="button" disabled class="unsupported" title="В текущем каноне нет заполненного architecture-тега">'+ic+' '+e(label)+' · нет данных</button>';
+    return '<button type="button" data-atmos-filter="'+e(key)+'" class="'+(state.filters.atmosphere[key]?"active":"")+'" title="По существующему каноническому полю">'+ic+' '+e(label)+'</button>';
+  }).join("")+'</div>';
 }
 function activeAdvancedFilterChips(){
   const f=state.filters,chips=[];
@@ -685,7 +688,7 @@ function renderSearch(){
         filterSection("Атмосфера",atmosphereFilterVisual())+
         filterSection("Бесплатно",'<label class="check"><input type="checkbox" data-quick="free" '+(state.quick==="free"?"checked":"")+'> Только бесплатные</label>')+
         filterSection("Скидка",'<label class="check"><input type="checkbox" data-adv-check="discountOnly" '+(state.filters.discountOnly?"checked":"")+'> Только со скидкой</label>')+
-        filterSection("Доступность билетов",'<label class="check"><input type="checkbox" data-adv-check="ticketsOnly" '+(state.filters.ticketsOnly?"checked":"")+'> Есть билеты</label><label class="check"><input type="checkbox" data-adv-check="buyOnSite" '+(state.filters.buyOnSite?"checked":"")+'> Можно купить на месте</label>')+
+        filterSection("Доступность билетов",'<label class="check"><input type="checkbox" data-adv-check="ticketsOnly" '+(state.filters.ticketsOnly?"checked":"")+'> Есть билеты</label><label class="check unsupported-check" title="В текущем каноне нет подтверждённых строк"><input type="checkbox" disabled> Можно купить на месте · нет данных</label>')+
       '</div></div>'+
     '</aside>'+
     '<section class="panel results-panel"><div class="results-toolbar"><div class="results-title">Найдено <b>'+results.length+'</b> варианта</div><div class="toolbar-right"><div class="view-toggle"><button class="active">'+icon("list")+' <span>Списком</span></button><button>'+icon("pin")+' <span>На карте</span></button></div></div></div>'+
