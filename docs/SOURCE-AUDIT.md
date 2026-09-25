@@ -1,73 +1,74 @@
 # APP-004 — Source Intake Audit
 **Дата:** 25.09.2026  
-**Статус:** FRESH CANON IDENTIFIED / WAITING FOR FRESH USER + TECH FILES
+**Статус:** VERIFIED CANON / BACKEND UNBLOCKED
 
-## Итог контрольной проверки
+## Проверенные канонические файлы
 
-Внешняя контрольная проверка подтвердила, что текущие Drive-файлы USER + TECH являются внутренне согласованной, но устаревшей парой.
+### TECH
+Оригинал:
+https://docs.google.com/spreadsheets/d/1dsJuQXZwUydYsldqMRuKg9WDsKJld7Un/edit?usp=drivesdk&ouid=109539816355164720249&rtpof=true&sd=true
 
-### Текущие Drive-файлы
+Проверенный размер: **550 669 байт**.
 
-USER:
-- старая согласованная версия;
-- отсутствуют более поздние листы:
-  - Обязательства / оплаты
-  - Совместные расходы
-  - Долги людям
-- История заканчивается на AB вместо AL;
-- Бухгалтерия заканчивается на N вместо W.
+Фактически подтверждено:
+- 45 листов;
+- последний лист: `45 — App Readiness Gate`;
+- модули 41–44 присутствуют;
+- 188 QA;
+- 187 PASS;
+- 0 PENDING;
+- 0 FAIL;
+- 1 SOAK;
+- единственный SOAK: `QA-014 Research → Visit`;
+- 80 APP requirements;
+- последний APP: `APP-086`.
 
-TECH:
-- 40 листов;
-- последний модуль: `40 — Refunds Corrections`;
-- отсутствуют модули:
-  - `41 — Commitments Cash State`
-  - `42 — Deposits Partial Payments`
-  - `43 — Shared Expenses`
-  - `44 — Payables to People`
-  - `45 — App Readiness Gate`
-- `27 — App-only Requirements`: 54 требований, до APP-060;
-- `26 — QA Regression`: 145 QA:
-  - 142 PASS
-  - 2 PENDING
-  - 0 FAIL
-  - 1 SOAK
+App Readiness Gate явно фиксирует:
+- QA-014 блокирует финальный live-release, но **не блокирует schema/backend**;
+- Supabase schema / transactions / LIVE backend / search parity можно начинать сейчас.
 
-PENDING:
-- QA-013
-- QA-015
+### USER
+Оригинал:
+https://docs.google.com/spreadsheets/d/11X4zMi3VgrG2ZgU9W_so0ZxacSUWjbA2/edit?usp=drivesdk&ouid=109539816355164720249&rtpof=true&sd=true
 
-SOAK:
-- QA-014 Research → Visit
+Проверенный размер: **243 732 байта**.
 
-## Более свежий канон
+Фактически подтверждено:
+- 13 листов;
+- присутствуют новые листы:
+  - `Обязательства / оплаты`
+  - `Совместные расходы`
+  - `Долги людям`
+- `История` расширена до AL;
+- `Бухгалтерия` расширена до W;
+- поздние financial/social overlays присутствуют.
 
-Контрольная проверка подтвердила существование более свежей пары:
-- `Stage7 PAYABLES + APP READINESS USER`
-- `Stage7 PAYABLES + APP READINESS TECH`
+## Ключевые поздние модули TECH
 
-В свежем TECH:
-- QA-013 и QA-015 уже закрыты PASS;
-- QA-014 остаётся единственным SOAK;
-- присутствуют модули 41–45;
-- APP requirements доходят до APP-086;
-- APP requirements всего: 80;
-- финальный `45 — App Readiness Gate` разрешает начинать Supabase schema/backend до завершения QA-014.
+- `41 — Commitments Cash State`
+- `42 — Deposits Partial Payments`
+- `43 — Shared Expenses`
+- `44 — Payables to People`
+- `45 — App Readiness Gate`
 
-Отсутствующие в старом Drive TECH требования:
-- APP-061–066 — commitment/payment state machine, committed free cash, refunds, payment-month accounting;
-- APP-067–072 — partial payments, prepayment, deposits, forfeiture;
-- APP-073–079 — shared expenses, receivables, reimbursements, gift/waiver;
-- APP-080–086 — payables to people, repayments, partial settlement, forgiveness, forecast/overlay.
+## Решение
 
-## Вывод
+Эта USER + TECH пара является текущим каноном APP-004.
 
-Текущую Drive-пару **НЕ использовать** для проектирования финальной Supabase schema.
+Backend-разработка разблокирована.
 
-Следующий шаг:
-1. получить свежие `Stage7 PAYABLES + APP READINESS USER/TECH`;
-2. заменить ими source-intake APP-004;
-3. обновить Google BACKUP SAFE snapshot;
-4. пересобрать entity map / enums / FK / constraints / transactions;
-5. после этого можно начинать Supabase/backend;
-6. QA-014 остаётся live SOAK и не блокирует начало backend-разработки.
+Core Supabase schema v1 уже применена 25.09.2026:
+- user-scoped RLS;
+- Places / Experiences / Research / Events Series+Occurrences / Visits;
+- evidence attribution;
+- Deals;
+- versioned Budget;
+- append-only Accounting Transactions;
+- Commitments + partial payments/deposits;
+- Shared Expenses + Receivables;
+- Payables to People;
+- Settings + Media.
+
+Следующий шаг: импорт канонических данных и transactional RPC parity.
+
+QA-014 остаётся реальным SOAK перед финальным релизом и не блокирует текущую разработку.
