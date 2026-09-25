@@ -16,9 +16,9 @@
 4. профиль восприятия;
 5. общий регламент.
 
-В текущем intake обнаружено расхождение: handoff описывает TECH с 188 QA и `45 — App Readiness Gate`, а приложенный TECH содержит 145 QA и листы только до `40 — Refunds Corrections`. См. `docs/SOURCE-AUDIT.md`.
+Контрольная проверка подтвердила: текущие Drive USER/TECH являются устаревшей согласованной парой. Более свежий канон существует в виде `Stage7 PAYABLES + APP READINESS USER/TECH`, где TECH содержит модули 41–45, APP-061–086 и финальный App Readiness Gate. QA-014 остаётся единственным SOAK и не блокирует начало backend-разработки.
 
-До разрешения расхождения нельзя фиксировать финальную Supabase schema и backend parity как завершённые.
+До получения свежих файлов нельзя применять финальную Supabase migration. После их получения и замены source-intake backend можно начинать без ожидания QA-014.
 
 ## Архитектурные инварианты
 
@@ -243,7 +243,10 @@ https://drive.google.com/file/d/14Z0ir3ptjyUi9vVGQqqx2Ra4_7JVTVKp/view?usp=drive
 
 ## Следующий технический шаг
 
-1. Получить TECH snapshot, который соответствует handoff 188 QA / App Readiness Gate, либо получить явное решение, что текущий TECH стал новым каноном.
-2. После этого составить entity map / enums / FK / unique constraints / indexes / transactional RPC.
-3. Сверить каждую сущность с APP requirements и QA matrix.
-4. Только затем применять Supabase migrations.
+1. Получить свежие `Stage7 PAYABLES + APP READINESS USER.xlsx` и `Stage7 PAYABLES + APP READINESS TECH.xlsx`.
+2. Заменить старые source-файлы в APP-004 и обновить Google BACKUP SAFE.
+3. Прочитать свежий TECH полностью, включая модули 41–45, APP-061–086 и App Readiness Gate.
+4. Составить финальный entity map / enums / FK / unique constraints / indexes / transactional RPC.
+5. Сверить сущности с APP requirements и QA matrix.
+6. После этого применять Supabase migrations и начинать backend.
+7. QA-014 Research → Visit остаётся live SOAK и не блокирует шаги 4–6.
