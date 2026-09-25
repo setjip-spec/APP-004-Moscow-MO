@@ -29,3 +29,17 @@
 - `docs/APP-004-VISUAL-TZ.md`
 - `docs/SOURCE-AUDIT.md`
 - `docs/LINKS.md`
+
+
+## Backend foundation
+
+On 2026-09-25 the fresh canonical USER/TECH pair was verified:
+- TECH: 45 sheets, 188 QA / 187 PASS / 1 SOAK, APP through APP-086.
+- USER: late commitments/shared/payables sheets present.
+- QA-014 is release soak only; schema/backend is allowed to proceed.
+
+Core relational Supabase schema v1 has been applied with RLS.
+
+See:
+- `docs/SOURCE-AUDIT.md`
+- `docs/DATA-MODEL.md`
