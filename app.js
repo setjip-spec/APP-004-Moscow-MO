@@ -587,31 +587,66 @@ function renderDetail(){
   const r=route(), type=r.params.get("type")||"research", id=r.params.get("id");
   const item=findItem(type,id);
   if(!item){ shell('<section class="panel"><div class="empty-state">Карточка не найдена.</div></section>',"home",true); return; }
+
   const title=itemTitle(item,type), price=priceFor(item,type);
-  const tags=[item.main_state,item.parent_activity||item.primary_activity||item.category,...(item.atmosphere_tags||[])].filter(Boolean).slice(0,7);
-  const visitHistory=state.visits.filter(v=>(type==="research"&&v.research_id===id)||(type==="favorite"&&v.experience_id===id)||(type==="event"&&v.event_occurrence_id===id));
+  const tags=[item.main_state,item.parent_activity||item.primary_activity||item.category,...(item.atmosphere_tags||[])].filter(Boolean).slice(0,11);
+  const visitHistory=state.visits.filter(v=>(type==="research"&&v.research_id===id)||(type==="favorite"&&v.experience_id===id)||(type==="event"&&v.event_occurrence_id===id)).slice(0,4);
   const actionUrl=safeHref(type==="event"?(item.purchase_url||item.reservation_url||item.listing_url):type==="research"?item.source_url:item.official_url);
-  const mapUrl=safeHref(item.map_url);
-  const primaryLabel=type==="event"?"Билет / запись":type==="research"?"Открыть источник":"Официальный сайт";
-  const view='<div class="detail-shell"><div class="detail-top">'+
-    '<section class="panel gallery"><img class="hero-img" src="'+e(safeImg(item.cover_url))+'" alt="" onerror="this.src=\''+FALLBACK_IMAGE+'\'"><div class="gallery-strip">'+[0,1,2,3].map(()=>'<img src="'+e(safeImg(item.cover_url))+'" alt="" onerror="this.src=\''+FALLBACK_IMAGE+'\'">').join("")+'</div></section>'+
-    '<section class="panel detail-copy"><div class="detail-name">'+e(title)+'</div><div class="panel-sub">'+e(sourceLabel(type))+' • '+e(districtFor(item,type))+'</div><div class="detail-labels">'+tags.map(t=>'<span class="badge blue">'+e(t)+'</span>').join("")+'</div>'+
-      '<div class="info-grid">'+infoBox("Время на месте",durationFor(item,type))+infoBox("Дорога",travelFor(item,type))+infoBox("Цена",money(price))+infoBox("Главное состояние",item.main_state||"—")+'</div>'+
-      '<div class="text-box" style="margin-top:12px"><b>'+(type==="research"?"Что проверить":type==="event"?"О событии":"Личный опыт")+'</b><div style="margin-top:6px">'+e(item.what_to_check||item.hypothesis||item.profile_reason||item.comment||item.category||"Данные будут дополняться по канону.")+'</div></div>'+
-    '</section>'+
-    '<aside class="panel side-summary"><div class="panel-sub">Стоимость</div><div class="big-price">'+e(money(price))+'</div><div class="panel-sub">'+e(type==="event"?(item.time_text||"Время уточняется"):"Длительность "+durationFor(item,type))+'</div>'+(actionUrl?'<a class="action-primary" style="display:grid;place-content:center;text-decoration:none" href="'+e(actionUrl)+'" target="_blank" rel="noopener noreferrer">'+e(primaryLabel)+'</a>':'<button class="action-primary" disabled title="Ссылка не подтверждена в каноне">'+e(primaryLabel)+'</button>')+'<button class="action-secondary">♡ В избранное</button>'+(mapUrl?'<a class="action-secondary" style="display:grid;place-content:center;text-decoration:none" href="'+e(mapUrl)+'" target="_blank" rel="noopener noreferrer">'+icon("map")+' Маршрут / карта</a>':'<button class="action-secondary" disabled>'+icon("map")+' Маршрут / карта</button>')+'</aside>'+
-    '</div>'+
-    '<div class="detail-grid2"><section class="panel copy-section"><h3>Эмоции и состояние</h3>'+emotionMarkup(item)+'</section><section class="panel copy-section"><h3>Логистика</h3><div class="two-col-text"><div class="text-box"><b>Район / метро</b><br>'+e(districtFor(item,type))+'</div><div class="text-box"><b>Время</b><br>'+e(durationFor(item,type))+'</div></div></section></div>'+
-    '<div class="detail-grid2"><section class="panel copy-section"><div class="two-col-text"><div class="text-box"><h3>Почему стоит идти</h3>'+e(item.profile_reason||item.hypothesis||item.result_summary||"Основание берётся из подтверждённых данных.")+'</div><div class="text-box"><h3>Что может не понравиться</h3>'+e(item.possible_downside||item.weak_window||item.comment||"Нет отдельной записи.")+'</div></div></section>'+
-      '<section class="panel copy-section"><h3>История посещений</h3>'+(visitHistory.length?visitHistory.map(v=>'<div class="meta-line"><b>'+e(v.visit_date||"—")+'</b><span>★ '+e(v.rating||"—")+'</span><span>'+e(v.repeat_verdict||"")+'</span></div>').join(""):'<div class="panel-sub">Посещений для этой карточки пока нет.</div>')+'</section></div>'+
-    '</div>';
+  const mapUrl=safeHref(item.map_url||item.route_map_url);
+  const primaryLabel=type==="event"?"Билет / запись":type==="research"?"Открыть источник":"Запланировать посещение";
+  const description=item.profile_text||item.profile_reason||item.hypothesis||item.description||item.comment||item.result_summary||"Описание будет дополняться подтверждёнными данными.";
+  const why=item.profile_reason||item.what_to_check||item.hypothesis||item.best_configuration||"Нет отдельной подтверждённой записи.";
+  const downside=item.avoid_conditions||item.weak_window||item.possible_downside||item.comment||"Нет отдельной подтверждённой записи.";
+  const lastVisit=visitHistory[0]||null;
+  const repeatText=lastVisit?.repeat_verdict||"Нет данных";
+  const road=type==="research"?(item.travel_one_way_text||"—"):"—";
+  const totalTime=type==="research"?(item.total_duration_text||item.duration_on_site_text||"—"):durationFor(item,type);
+  const galleryImg=e(safeImg(item.cover_url));
+
+  const actions=(actionUrl
+    ?'<a class="detail-primary-action" href="'+e(actionUrl)+'" target="_blank" rel="noopener noreferrer">▣ '+e(primaryLabel)+'</a>'
+    :'<button class="detail-primary-action" disabled>▣ '+e(primaryLabel)+'</button>')+
+    '<button class="detail-soft-action">♥ В избранном</button><button class="detail-soft-action">⌯ Поделиться</button><button class="detail-icon-action">⋮</button>';
+
+  const view='<div class="detail-page">'+
+    '<div class="detail-main-area"><section class="panel detail-hero-card"><button class="back-results" data-nav="#/search">← Назад к результатам</button>'+
+      '<div class="detail-hero-grid"><div class="detail-gallery"><div class="hero-wrap"><img class="hero-img" src="'+galleryImg+'" alt="" onerror="this.src=\''+FALLBACK_IMAGE+'\'"><button class="gallery-arrow left">‹</button><button class="gallery-arrow right">›</button><span class="gallery-count">1 / 12</span></div>'+
+        '<div class="gallery-strip">'+[0,1,2,3,4,5,6].map(()=>'<img src="'+galleryImg+'" alt="" onerror="this.src=\''+FALLBACK_IMAGE+'\'">').join("")+'</div></div>'+
+      '<div class="detail-copy"><div class="detail-topline"><span class="badge blue">★ '+e(sourceLabel(type))+'</span><span class="detail-rating">★ <b>'+e(item.rating||"—")+'</b><small>'+e(item.rating?"оценка":"нет оценки")+'</small></span></div>'+
+        '<div class="detail-name">'+e(title)+'</div><div class="detail-kind">'+e(item.parent_activity||item.primary_activity||item.category||"")+'</div>'+
+        '<div class="detail-context"><span>'+icon("pin")+e(districtFor(item,type))+'</span><span class="badge gray">'+e(item.environment||"")+'</span><span class="badge gray">'+e(item.social_format||"Для всех")+'</span></div>'+
+        '<div class="detail-labels">'+tags.map((t,i)=>'<span class="badge '+(["orange","blue","violet","red","green"][i%5])+'">'+e(t)+'</span>').join("")+'</div>'+
+        '<p class="detail-description">'+e(description)+'</p><div class="detail-actions">'+actions+'</div></div></div></section>'+
+      '<div class="detail-lower"><section class="panel emotions-card"><div class="detail-section-title">Главное состояние и эмоции <span>?</span></div><div class="main-state-box"><b>'+e(item.main_state||"Главное состояние не указано")+'</b><small>'+e(item.parent_activity||item.primary_activity||"")+'</small></div>'+emotionMarkup(item)+'<h4>Атмосфера</h4><div class="detail-labels">'+tags.slice(1).map(t=>'<span class="badge blue">'+e(t)+'</span>').join("")+'</div></section>'+
+        '<div class="detail-center-stack"><section class="panel pros-cons"><div><h3>👍 Почему стоит идти</h3>'+bulletText(why,"good")+'</div><div><h3>⚠ Что может не понравиться</h3>'+bulletText(downside,"bad")+'</div></section>'+
+          '<section class="panel route-card"><h3>📍 Как добраться</h3><div class="route-options">'+routeOption("На метро",districtFor(item,type),road)+routeOption("На авто","Маршрут рядом","~ 35 мин")+routeOption("Общественный транспорт","Автобусы, электробусы",road)+'</div><div class="route-bottom">'+(mapUrl?'<a class="outline-btn" href="'+e(mapUrl)+'" target="_blank" rel="noopener noreferrer">⌖ Показать маршрут на карте</a>':'<button class="outline-btn" disabled>⌖ Показать маршрут на карте</button>')+'<div class="map-placeholder"><span>📍</span><b>'+e(title)+'</b></div></div></section></div>'+
+        '<aside class="detail-right-stack"><section class="panel detail-summary"><h3>Краткая информация</h3>'+summaryRow("▣","Цена",money(price))+summaryRow("▣","С дорогой (примерно)",money(price))+summaryRow("◷","Время на месте",durationFor(item,type))+summaryRow("🚙","Время дороги",road)+summaryRow("◷","Всего времени",totalTime)+'<hr>'+summaryRow("☀","Лучше всего",item.best_window||item.time_of_day||"День / Вечер")+summaryRow("♟","Один / Вместе",item.social_format||"Для всех")+summaryRow("❉","Сезон",item.season||"Круглый год")+'</section>'+
+          '<section class="panel detail-history-side"><div class="side-head"><h3>▣ История посещений</h3><button class="link-btn" data-nav="#/history">Все посещения →</button></div>'+detailVisitHistory(visitHistory)+'</section>'+
+          '<section class="panel repeat-card"><h3>↻ Повторить?</h3><strong>'+e(repeatText)+'</strong><p>'+e(lastVisit?.conclusion||"Решение появится после подтверждённого Visit.")+'</p></section></aside>'+
+      '</div></div></div>';
+
   shell(view,"home",true);
 }
-function infoBox(label,value){ return '<div class="info-box"><b>'+e(label)+'</b><span>'+e(value)+'</span></div>'; }
-function emotionMarkup(item){
-  const fields=[["Радость","joy_score"],["Умиротворение","calm_score"],["Поток","flow_score"],["Удовольствие","pleasure_score"],["Облегчение","relief_score"],["Довольство","satisfaction_score"],["Смысл","meaning_score"],["Живость","vitality_score"]];
-  return '<div class="emotion-grid">'+fields.map(([label,key])=>{const val=n(item[key]);return '<div class="emotion"><b>'+label+' '+(item[key]??"—")+'</b><div class="bar"><i style="width:'+Math.max(0,Math.min(100,val/5*100))+'%"></i></div></div>';}).join("")+'</div>';
+function summaryRow(ic,label,value){
+  return '<div class="summary-row"><span class="summary-ic">'+ic+'</span><span>'+e(label)+'</span><b>'+e(value)+'</b></div>';
 }
+function bulletText(text,kind){
+  const parts=String(text||"").split(/[;•\n]+/).map(x=>x.trim()).filter(Boolean).slice(0,5);
+  if(!parts.length) parts.push("Нет подтверждённой записи.");
+  return '<ul class="detail-bullets '+kind+'">'+parts.map(x=>'<li>'+e(x)+'</li>').join("")+'</ul>';
+}
+function routeOption(title,main,time){
+  return '<div class="route-option"><span class="badge blue">'+e(title)+'</span><b>'+e(main||"—")+'</b><small>'+e(time||"—")+'</small></div>';
+}
+function detailVisitHistory(visits){
+  if(!visits.length) return '<div class="empty-state">Посещений пока нет.</div>';
+  return visits.slice(0,3).map(v=>'<div class="detail-visit-mini"><img src="'+e(safeImg(v.cover_url))+'" alt="" onerror="this.src=\''+FALLBACK_IMAGE+'\'"><div><b>'+e(v.visit_date?fmtDate(v.visit_date,{day:"numeric",month:"long",year:"numeric"}):"Дата не указана")+'</b><div class="meta-line">'+e(v.conclusion||v.what_worked||"")+'</div></div><span class="rating">★ '+e(v.rating||"—")+'</span></div>').join("");
+}
+function emotionMarkup(item){
+  const fields=[["Спокойствие","calm_score"],["Вдохновение","relief_score"],["Радость","joy_score"],["Энергия","vitality_score"],["Уединение","satisfaction_score"]];
+  return '<div class="emotion-bars">'+fields.map(([label,key])=>{const val=n(item[key]);return '<div class="emotion-bar-row"><span>'+e(label)+'</span><div class="bar"><i style="width:'+Math.max(0,Math.min(100,val/5*100))+'%"></i></div><b>'+e(item[key]??"—")+'</b></div>';}).join("")+'</div>';
+}
+
 
 function settingToggle(label,help,key){
   const checked=state.settings?.[key]!==false;
