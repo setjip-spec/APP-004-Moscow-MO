@@ -18,3 +18,5 @@
 
 ## Current status
 Visual/UI kit approved. Fresh canon verified. Core relational schema + canonical data import completed. Next: transactional RPC/budget parity, then frontend. QA-014 remains release soak only.
+
+- Backup snapshot v0.2: https://drive.google.com/drive/folders/1XUhJyLo-7HKxDquHuDoo85R4OKXC6yAw
