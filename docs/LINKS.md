@@ -17,4 +17,4 @@
 - Source-intake snapshot v0.0: https://drive.google.com/drive/folders/1Mn-lvdy3zm7L96pOrqtX1bdGdudYQ5X6
 
 ## Current status
-Visual/UI kit is approved. Fresh canonical USER/TECH are verified. Core Supabase schema v1 is applied with RLS. Backend is now unblocked; next stage is canonical data import + transactional RPCs + frontend. QA-014 remains release soak only.
+Visual/UI kit approved. Fresh canon verified. Core relational schema + canonical data import completed. Next: transactional RPC/budget parity, then frontend. QA-014 remains release soak only.
