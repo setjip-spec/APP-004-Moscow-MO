@@ -1,5 +1,5 @@
 # APP-004 — Москва и МО — ТЗ
-## DRAFT v0.9 — backend foundation
+## DRAFT v0.10 — canonical data imported
 
 **Статус:** ТЗ В РАБОТЕ  
 **Дата:** 25.09.2026  
@@ -272,3 +272,25 @@ Detailed mapping: `docs/DATA-MODEL.md`.
 4. Build GitHub Pages frontend against approved visual-kit.
 5. Run parity/integration QA.
 6. QA-014 remains the final real-world soak before full release.
+
+
+## Canonical data import — 25.09.2026
+
+Импортированы реальные канонические данные:
+- 25 Sources;
+- 149 Places;
+- 12 Routes;
+- 21 Experiences;
+- 10 Favorite editable projections;
+- 166 Research;
+- 166 Stage6/PASS2 evaluation rows;
+- 37 Event Series;
+- 40 Event Occurrences;
+- 21 Visits;
+- 1 production Deal.
+
+Никакие пустые USER financial sheets не заполнялись синтетическими обязательствами/долгами/проводками.
+
+Отчёт: `docs/IMPORT-REPORT.md`.
+
+Следующий этап: transactional RPC parity + monthly budget functions, затем frontend.
