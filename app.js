@@ -639,7 +639,7 @@ function atmosphereLabels(item){
   for(const [key,cfg] of Object.entries(ATMOSPHERE_FILTERS)){
     if(cfg.field){
       const v=scoreValue(item,cfg.field);
-      if(v!==null&&v>=3){
+      if(v!==null&&v>0){
         const names={water:"Вода",greenery:"Зелень",lights:"Огни",music:"Музыка",fountains:"Фонтаны",panorama:"Простор",calm:"Спокойствие"};
         labels.push(names[key]||key);
       }
