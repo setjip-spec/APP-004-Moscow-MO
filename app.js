@@ -155,7 +155,7 @@ function parseMinutesText(text){
   const nums=parseNumberList(s);
   if(!nums.length) return null;
   const max=Math.max(...nums);
-  if(/\bч\b|час/.test(s)) return Math.round(max*60);
+  if(/(?:^|\s)ч(?:\.|\s|$)|час/.test(s)) return Math.round(max*60);
   if(/мин/.test(s)) return Math.round(max);
   return null;
 }
