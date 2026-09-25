@@ -10,6 +10,8 @@
 - UI references / APPROVED: https://drive.google.com/drive/folders/1uyNeHnu0pqPsM5ZVnigCm0LsvPVEjQ6t
 - Approved Dashboard image: https://drive.google.com/file/d/1rMwv0gL9Xi5CMfGMBKRDJKvrU_uFzetQ/view?usp=drivesdk
 - Approved Search / Results image: https://drive.google.com/file/d/1Qxb4jRrfrDyQyTz2HBpFoUQXsEY0A7IU/view?usp=drivesdk
+- Approved History image: https://drive.google.com/file/d/1lLyHkaBfycYKTQex6JI0afPm8XyfuOJt/view?usp=drivesdk
+- Approved Detail Card image: https://drive.google.com/file/d/1KL60XHyYpLc2QXpeijfvtzcum0KcJvZQ/view?usp=drivesdk
 - Source-intake snapshot v0.0: https://drive.google.com/drive/folders/1Mn-lvdy3zm7L96pOrqtX1bdGdudYQ5X6
 
 ## Current status
