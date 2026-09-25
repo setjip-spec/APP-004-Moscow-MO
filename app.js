@@ -23,6 +23,21 @@ const state = {
   quick: "",
   searchText: "",
   resultSort: "relevance",
+  filters: {
+    district: "",
+    environment: "",
+    mainState: "",
+    experienceClass: "",
+    experienceSubtype: "",
+    maxPrice: null,
+    maxTravel: null,
+    maxTotalMinutes: null,
+    discountOnly: false,
+    ticketsOnly: false,
+    buyOnSite: false,
+    emotions: {},
+    atmosphere: {}
+  },
   historyExpanded: null,
   lastError: ""
 };
@@ -129,6 +144,81 @@ function durationFor(item,type){
 function travelFor(item,type){
   if(type==="research") return item.travel_one_way_text||"—";
   return "—";
+}
+function parseNumberList(text){
+  if(text===null||text===undefined) return [];
+  return String(text).replace(/,/g,".").match(/\d+(?:\.\d+)?/g)?.map(Number).filter(Number.isFinite)||[];
+}
+function parseMinutesText(text){
+  if(!text) return null;
+  const s=String(text).toLowerCase();
+  const nums=parseNumberList(s);
+  if(!nums.length) return null;
+  const max=Math.max(...nums);
+  if(/\bч\b|час/.test(s)) return Math.round(max*60);
+  if(/мин/.test(s)) return Math.round(max);
+  return null;
+}
+function itemTravelMinutes(item,type){
+  if(type==="research") return parseMinutesText(item.travel_one_way_text);
+  return null;
+}
+function itemTotalMinutes(item,type){
+  if(type==="research"){
+    const explicit=parseMinutesText(item.total_duration_text);
+    if(explicit!==null) return explicit;
+    const onsite=parseMinutesText(item.duration_on_site_text), travel=parseMinutesText(item.travel_one_way_text);
+    if(onsite!==null && travel!==null) return onsite+travel*2;
+    return onsite;
+  }
+  if(type==="favorite") return parseMinutesText(item.duration_text);
+  if(type==="event" && item.starts_at && item.ends_at){
+    const a=new Date(item.starts_at),b=new Date(item.ends_at);
+    if(!Number.isNaN(a.getTime())&&!Number.isNaN(b.getTime())&&b>a) return Math.round((b-a)/60000);
+  }
+  return parseMinutesText(item.time_text);
+}
+function scoreValue(item,key){
+  const v=item?.[key];
+  if(v===null||v===undefined||v==="") return null;
+  const x=Number(v); return Number.isFinite(x)?x:null;
+}
+const ATMOSPHERE_FILTERS={
+  water:{field:"water_score",terms:["вода","вод"]},
+  greenery:{field:"nature_score",terms:["зелень","природа","парк","лес"]},
+  lights:{field:"evening_lights_score",terms:["огни","подсвет"]},
+  music:{field:"music_score",terms:["музы"]},
+  fountains:{field:"light_fountains_score",terms:["фонтан"]},
+  panorama:{field:"panorama_scale_score",terms:["простор","панорам","масштаб"]},
+  calm:{field:"calm_score",terms:["тишина","спокой","умиротвор"]},
+  architecture:{field:null,terms:["архитект"]}
+};
+function atmosphereMatch(item,key,minScore=1){
+  const cfg=ATMOSPHERE_FILTERS[key]; if(!cfg) return true;
+  if(cfg.field){
+    const v=scoreValue(item,cfg.field);
+    if(v!==null) return v>=minScore;
+  }
+  const tags=(Array.isArray(item.atmosphere_tags)?item.atmosphere_tags:[]).join(" ").toLowerCase();
+  return cfg.terms.some(t=>tags.includes(t));
+}
+function hasDiscount(item){
+  const pct=scoreValue(item,"discount_percent");
+  if(pct!==null && pct>0) return true;
+  const regular=scoreValue(item,"regular_price"), current=scoreValue(item,"current_price");
+  return regular!==null&&current!==null&&current<regular;
+}
+function isTicketAvailable(item,type){
+  if(type!=="event") return false;
+  return ["AVAILABLE","FREE"].includes(String(item.availability_status||"").toUpperCase());
+}
+function canBuyOnSite(item,type){
+  if(type!=="event") return false;
+  const text=[item.access_format,item.access_condition,item.booking_requirement].filter(Boolean).join(" ").toLowerCase();
+  return /на месте|касс|без брони|без предвар/.test(text);
+}
+function resetAdvancedFilters(){
+  state.filters={district:"",environment:"",mainState:"",experienceClass:"",experienceSubtype:"",maxPrice:null,maxTravel:null,maxTotalMinutes:null,discountOnly:false,ticketsOnly:false,buyOnSite:false,emotions:{},atmosphere:{}};
 }
 
 function brandMarkup(){
@@ -415,12 +505,16 @@ function renderDashboard(){
 function filterItems(items,type){
   const q=state.searchText.trim().toLowerCase();
   const quick=state.quick;
+  const f=state.filters;
   return items.filter(x=>{
     const text=[
       itemTitle(x,type),districtFor(x,type),x.parent_activity,x.primary_activity,x.category,x.main_state,
+      x.environment,x.experience_class,x.experience_subtype,x.access_format,x.access_condition,
       ...(Array.isArray(x.atmosphere_tags)?x.atmosphere_tags:[])
     ].filter(Boolean).join(" ").toLowerCase();
-    if(q && !q.split(/\s+/).every(word=>text.includes(word.replace(/[+]/g,"")))) return false;
+
+    if(q && !q.split(/\s+/).filter(Boolean).every(word=>text.includes(word.replace(/[+]/g,"")))) return false;
+
     if(quick==="free" && Number(priceFor(x,type))!==0) return false;
     if(quick==="evening" && !(String(x.time_of_day||x.best_window||x.time_text||"").toLowerCase().includes("веч"))) return false;
     if(quick==="day" && !(String(x.time_of_day||x.best_window||x.time_text||"").toLowerCase().includes("день")||String(x.time_of_day||"").toLowerCase().includes("дн"))) return false;
@@ -429,6 +523,38 @@ function filterItems(items,type){
     if(quick==="moscow" && String(x.geo_scope||x.district_city||"Москва").toLowerCase().includes("мо ")) return false;
     if(quick==="mo" && !String(x.geo_scope||x.district_city||"").toLowerCase().includes("мо")) return false;
     if(type==="event" && ["today","tomorrow","weekend","14d"].includes(quick) && !eventDateMatch(x,quick)) return false;
+
+    if(f.district && !districtFor(x,type).toLowerCase().includes(f.district.toLowerCase())) return false;
+    if(f.environment && !String(x.environment||"").toLowerCase().includes(f.environment.toLowerCase())) return false;
+    if(f.mainState && !String(x.main_state||"").toLowerCase().includes(f.mainState.toLowerCase())) return false;
+    if(f.experienceClass && !String(x.experience_class||x.parent_activity||x.primary_activity||x.category||"").toLowerCase().includes(f.experienceClass.toLowerCase())) return false;
+    if(f.experienceSubtype && !String(x.experience_subtype||"").toLowerCase().includes(f.experienceSubtype.toLowerCase())) return false;
+
+    if(f.maxPrice!==null){
+      const p=priceFor(x,type);
+      if(p===null||p===undefined||p===""||Number(p)>f.maxPrice) return false;
+    }
+    if(f.maxTravel!==null){
+      const m=itemTravelMinutes(x,type);
+      if(m===null||m>f.maxTravel) return false;
+    }
+    if(f.maxTotalMinutes!==null){
+      const m=itemTotalMinutes(x,type);
+      if(m===null||m>f.maxTotalMinutes) return false;
+    }
+    if(f.discountOnly && !hasDiscount(x)) return false;
+    if(f.ticketsOnly && !isTicketAvailable(x,type)) return false;
+    if(f.buyOnSite && !canBuyOnSite(x,type)) return false;
+
+    for(const [key,min] of Object.entries(f.emotions||{})){
+      if(!min) continue;
+      const v=scoreValue(x,key);
+      if(v===null||v<Number(min)) return false;
+    }
+    for(const [key,min] of Object.entries(f.atmosphere||{})){
+      if(!min) continue;
+      if(!atmosphereMatch(x,key,Number(min))) return false;
+    }
     return true;
   });
 }
