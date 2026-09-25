@@ -69,6 +69,18 @@ function safeImg(url){
   }catch{}
   return FALLBACK_IMAGE;
 }
+function safeHref(url){
+  if(!url) return "";
+  try{
+    const u=new URL(url,location.href);
+    if(["http:","https:"].includes(u.protocol)) return u.href;
+  }catch{}
+  return "";
+}
+function tempFmt(v){
+  const x=Math.round(n(v));
+  return (x>0?"+":"")+x+"°";
+}
 function fmtDate(v,opts={day:"numeric",month:"long"}){
   if(!v) return "Дата не указана";
   const d=new Date(v.length===10?v+"T12:00:00+03:00":v);
@@ -225,7 +237,7 @@ async function loadAll(){
     const expMap=new Map(exps.map(x=>[x.id,x])), placeMap=new Map(places.map(x=>[x.id,x]));
     state.favorites=projections.map(p=>{
       const ex=expMap.get(p.experience_id)||{}, pl=placeMap.get(ex.place_id)||{};
-      return {...ex,...p,title:pl.name||ex.variant_name||ex.parent_activity||"Без названия",district_city:pl.district_city,nearest_transit:pl.nearest_transit};
+      return {...ex,...p,title:pl.name||ex.variant_name||ex.parent_activity||"Без названия",district_city:pl.district_city,nearest_transit:pl.nearest_transit,official_url:pl.official_url};
     });
     state.research=rs.data||[];
     state.events=(es.data||[]).filter(x=>eventStillCurrent(x));
@@ -427,6 +439,7 @@ function renderSearch(){
   const src=r.params.get("source");
   if(src && ["favorite","research","event"].includes(src)){
     state.sources={favorite:false,research:false,event:false};state.sources[src]=true;
+    history.replaceState(null,"",location.pathname+location.search+"#/search");
   }
   const results=allSearchItems();
   const rows=results.map(({type,item})=>resultRow(item,type)).join("");
@@ -493,13 +506,16 @@ function renderDetail(){
   const title=itemTitle(item,type), price=priceFor(item,type);
   const tags=[item.main_state,item.parent_activity||item.primary_activity||item.category,...(item.atmosphere_tags||[])].filter(Boolean).slice(0,7);
   const visitHistory=state.visits.filter(v=>(type==="research"&&v.research_id===id)||(type==="favorite"&&v.experience_id===id)||(type==="event"&&v.event_occurrence_id===id));
+  const actionUrl=safeHref(type==="event"?(item.purchase_url||item.reservation_url||item.listing_url):type==="research"?item.source_url:item.official_url);
+  const mapUrl=safeHref(item.map_url);
+  const primaryLabel=type==="event"?"Билет / запись":type==="research"?"Открыть источник":"Официальный сайт";
   const view='<div class="detail-shell"><div class="detail-top">'+
     '<section class="panel gallery"><img class="hero-img" src="'+e(safeImg(item.cover_url))+'" alt="" onerror="this.src=\''+FALLBACK_IMAGE+'\'"><div class="gallery-strip">'+[0,1,2,3].map(()=>'<img src="'+e(safeImg(item.cover_url))+'" alt="" onerror="this.src=\''+FALLBACK_IMAGE+'\'">').join("")+'</div></section>'+
     '<section class="panel detail-copy"><div class="detail-name">'+e(title)+'</div><div class="panel-sub">'+e(sourceLabel(type))+' • '+e(districtFor(item,type))+'</div><div class="detail-labels">'+tags.map(t=>'<span class="badge blue">'+e(t)+'</span>').join("")+'</div>'+
       '<div class="info-grid">'+infoBox("Время на месте",durationFor(item,type))+infoBox("Дорога",travelFor(item,type))+infoBox("Цена",money(price))+infoBox("Главное состояние",item.main_state||"—")+'</div>'+
       '<div class="text-box" style="margin-top:12px"><b>'+(type==="research"?"Что проверить":type==="event"?"О событии":"Личный опыт")+'</b><div style="margin-top:6px">'+e(item.what_to_check||item.hypothesis||item.profile_reason||item.comment||item.category||"Данные будут дополняться по канону.")+'</div></div>'+
     '</section>'+
-    '<aside class="panel side-summary"><div class="panel-sub">Стоимость</div><div class="big-price">'+e(money(price))+'</div><div class="panel-sub">'+e(type==="event"?(item.time_text||"Время уточняется"):"Длительность "+durationFor(item,type))+'</div><button class="action-primary">'+(type==="event"?"Подробнее / билет":"Запланировать")+'</button><button class="action-secondary">♡ В избранное</button><button class="action-secondary">'+icon("map")+' Маршрут / карта</button></aside>'+
+    '<aside class="panel side-summary"><div class="panel-sub">Стоимость</div><div class="big-price">'+e(money(price))+'</div><div class="panel-sub">'+e(type==="event"?(item.time_text||"Время уточняется"):"Длительность "+durationFor(item,type))+'</div>'+(actionUrl?'<a class="action-primary" style="display:grid;place-content:center;text-decoration:none" href="'+e(actionUrl)+'" target="_blank" rel="noopener noreferrer">'+e(primaryLabel)+'</a>':'<button class="action-primary" disabled title="Ссылка не подтверждена в каноне">'+e(primaryLabel)+'</button>')+'<button class="action-secondary">♡ В избранное</button>'+(mapUrl?'<a class="action-secondary" style="display:grid;place-content:center;text-decoration:none" href="'+e(mapUrl)+'" target="_blank" rel="noopener noreferrer">'+icon("map")+' Маршрут / карта</a>':'<button class="action-secondary" disabled>'+icon("map")+' Маршрут / карта</button>')+'</aside>'+
     '</div>'+
     '<div class="detail-grid2"><section class="panel copy-section"><h3>Эмоции и состояние</h3>'+emotionMarkup(item)+'</section><section class="panel copy-section"><h3>Логистика</h3><div class="two-col-text"><div class="text-box"><b>Район / метро</b><br>'+e(districtFor(item,type))+'</div><div class="text-box"><b>Время</b><br>'+e(durationFor(item,type))+'</div></div></section></div>'+
     '<div class="detail-grid2"><section class="panel copy-section"><div class="two-col-text"><div class="text-box"><h3>Почему стоит идти</h3>'+e(item.profile_reason||item.hypothesis||item.result_summary||"Основание берётся из подтверждённых данных.")+'</div><div class="text-box"><h3>Что может не понравиться</h3>'+e(item.possible_downside||item.weak_window||item.comment||"Нет отдельной записи.")+'</div></div></section>'+
@@ -606,12 +622,14 @@ async function init(){
   state.session=session;
   if(session) await loadAll();
   renderCurrent();
-  supabase.auth.onAuthStateChange(async(event,sessionNow)=>{
-    const changed=(state.session?.access_token||"")!==(sessionNow?.access_token||"");
-    state.session=sessionNow;
-    if(changed && sessionNow){ await loadAll(); }
-    if(!sessionNow){ state.favorites=[];state.research=[];state.events=[];state.visits=[];state.settings=null;state.budget=null; }
-    renderCurrent();
+  supabase.auth.onAuthStateChange((event,sessionNow)=>{
+    setTimeout(async()=>{
+      const changed=(state.session?.access_token||"")!==(sessionNow?.access_token||"");
+      state.session=sessionNow;
+      if(changed && sessionNow){ await loadAll(); }
+      if(!sessionNow){ state.favorites=[];state.research=[];state.events=[];state.visits=[];state.settings=null;state.budget=null; }
+      renderCurrent();
+    },0);
   });
 }
 init();
