@@ -17,4 +17,4 @@
 - Source-intake snapshot v0.0: https://drive.google.com/drive/folders/1Mn-lvdy3zm7L96pOrqtX1bdGdudYQ5X6
 
 ## Current status
-GitHub scaffold and source-intake backup are created. Visual/UI kit is approved. Visual/UI kit is approved. Source mismatch is resolved conceptually: current Drive USER/TECH are stale. Waiting for fresh Stage7 PAYABLES + APP READINESS USER/TECH files; once received, Supabase/backend may start without waiting for QA-014.
+Visual/UI kit is approved. Fresh canonical USER/TECH are verified. Core Supabase schema v1 is applied with RLS. Backend is now unblocked; next stage is canonical data import + transactional RPCs + frontend. QA-014 remains release soak only.
