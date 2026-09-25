@@ -580,6 +580,74 @@ function allSearchItems(){
   if(state.resultSort==="name") out.sort((a,b)=>itemTitle(a.item,a.type).localeCompare(itemTitle(b.item,b.type),"ru"));
   return out;
 }
+function uniqueSearchValues(getter){
+  const values=[];
+  for(const [type,arr] of [["favorite",state.favorites],["research",state.research],["event",state.events]]){
+    for(const item of arr){
+      const v=getter(item,type);
+      if(v!==null&&v!==undefined&&String(v).trim()) values.push(String(v).trim());
+    }
+  }
+  return [...new Set(values)].sort((a,b)=>a.localeCompare(b,"ru"));
+}
+function selectOptions(values,current,placeholder="Все"){
+  return '<option value="">'+e(placeholder)+'</option>'+values.map(v=>'<option value="'+e(v)+'" '+(current===v?"selected":"")+'>'+e(v)+'</option>').join("");
+}
+function advSegment(key,items,current){
+  return '<div class="segment">'+items.map(([value,label])=>'<button type="button" data-adv-button="'+e(key)+'" data-adv-value="'+e(value)+'" class="'+(current===value?"active":"")+'">'+e(label)+'</button>').join("")+'</div>';
+}
+function advancedRange(key,max,step,unit){
+  const value=state.filters[key]===null?max:Number(state.filters[key]);
+  const display=state.filters[key]===null?"Любая":new Intl.NumberFormat("ru-RU",{maximumFractionDigits:0}).format(value)+(unit||"");
+  return '<div class="range-control"><input type="range" min="0" max="'+e(max)+'" step="'+e(step)+'" value="'+e(value)+'" data-adv-range="'+e(key)+'"><div class="range-control-meta"><span>0</span><b>'+e(display)+'</b><button type="button" data-clear-range="'+e(key)+'" '+(state.filters[key]===null?"disabled":"")+'>×</button></div></div>';
+}
+function mainStateFilter(){
+  const values=["Умиротворение","Живость","Радость","Поток","Удовольствие","Облегчение","Смысл","Довольство"];
+  return '<div class="state-chip-grid"><button type="button" data-adv-button="mainState" data-adv-value="" class="'+(!state.filters.mainState?"active":"")+'">Любое</button>'+
+    values.map(v=>'<button type="button" data-adv-button="mainState" data-adv-value="'+e(v)+'" class="'+(state.filters.mainState===v?"active":"")+'">'+e(v)+'</button>').join("")+'</div>';
+}
+function emotionFilterVisual(){
+  const defs=[["Радость","joy_score"],["Умиротворение","calm_score"],["Поток","flow_score"],["Удовольствие","pleasure_score"],["Облегчение","relief_score"],["Довольство","satisfaction_score"],["Смысл","meaning_score"],["Живость","vitality_score"]];
+  return defs.map(([label,key])=>{
+    const cur=Number(state.filters.emotions[key]||0);
+    return '<label class="emotion-filter"><span>●</span><span>'+e(label)+'</span><div class="mini-slider"><i style="width:'+e(cur?cur/5*100:0)+'%"></i><b style="left:'+e(cur?cur/5*100:0)+'%"></b></div><select data-emotion-filter="'+e(key)+'"><option value="0">Любая</option><option value="2" '+(cur===2?"selected":"")+'>≥ 2</option><option value="3" '+(cur===3?"selected":"")+'>≥ 3</option><option value="4" '+(cur===4?"selected":"")+'>≥ 4</option></select></label>';
+  }).join("");
+}
+function atmosphereFilterVisual(){
+  const defs=[["💧","Вода","water"],["♣","Зелень","greenery"],["▣","Огни","lights"],["♫","Музыка","music"],["♨","Фонтаны","fountains"],["◫","Простор","panorama"],["☾","Спокойствие","calm"],["⚒","Архитектура","architecture"]];
+  return '<div class="atmo-grid">'+defs.map(([ic,label,key])=>'<button type="button" data-atmos-filter="'+e(key)+'" class="'+(state.filters.atmosphere[key]?"active":"")+'" title="'+(key==="architecture"?"По тегу; числовой шкалы в каноне нет":"По существующей канонической шкале")+'">'+ic+' '+e(label)+'</button>').join("")+'</div>';
+}
+function activeAdvancedFilterChips(){
+  const f=state.filters,chips=[];
+  if(f.district) chips.push("Район: "+f.district);
+  if(f.environment) chips.push(f.environment);
+  if(f.mainState) chips.push("Состояние: "+f.mainState);
+  if(f.experienceClass) chips.push("Класс: "+f.experienceClass);
+  if(f.experienceSubtype) chips.push("Подтип: "+f.experienceSubtype);
+  if(f.maxPrice!==null) chips.push("До "+money(f.maxPrice));
+  if(f.maxTravel!==null) chips.push("Дорога ≤ "+f.maxTravel+" мин");
+  if(f.maxTotalMinutes!==null) chips.push("Всего ≤ "+Math.round(f.maxTotalMinutes/60*10)/10+" ч");
+  if(f.discountOnly) chips.push("Со скидкой");
+  if(f.ticketsOnly) chips.push("Есть билеты");
+  if(f.buyOnSite) chips.push("Покупка на месте");
+  for(const [key,min] of Object.entries(f.emotions)) if(min) chips.push(key.replace("_score","")+" ≥ "+min);
+  for(const key of Object.keys(f.atmosphere)) if(f.atmosphere[key]) chips.push("Атмосфера: "+key);
+  return chips;
+}
+function atmosphereLabels(item){
+  const labels=[];
+  for(const [key,cfg] of Object.entries(ATMOSPHERE_FILTERS)){
+    if(cfg.field){
+      const v=scoreValue(item,cfg.field);
+      if(v!==null&&v>=3){
+        const names={water:"Вода",greenery:"Зелень",lights:"Огни",music:"Музыка",fountains:"Фонтаны",panorama:"Простор",calm:"Спокойствие"};
+        labels.push(names[key]||key);
+      }
+    }
+  }
+  for(const t of (Array.isArray(item.atmosphere_tags)?item.atmosphere_tags:[])) if(t&&!labels.includes(t)) labels.push(t);
+  return labels.slice(0,4);
+}
 function renderSearch(){
   const r=route();
   const src=r.params.get("source");
@@ -589,32 +657,43 @@ function renderSearch(){
   }
   const results=allSearchItems();
   const rows=results.map(({type,item},i)=>resultRow(item,type,i+1)).join("");
+  const districts=uniqueSearchValues((item,type)=>districtFor(item,type)).slice(0,120);
+  const classes=uniqueSearchValues(item=>item.experience_class||item.parent_activity||item.primary_activity||item.category).slice(0,120);
+  const subtypes=uniqueSearchValues(item=>item.experience_subtype).slice(0,120);
+  const advancedChips=activeAdvancedFilterChips();
+
   const view='<div class="results-shell">'+
     '<aside class="panel filter-panel search-filter-panel"><div class="panel-head filter-main-head"><div class="panel-title-wrap"><span class="panel-icon blue">'+icon("filter")+'</span><div class="panel-title">Фильтры</div></div><span class="badge gray">Вариант 2</span></div>'+
       '<div class="filter-columns"><div class="filter-column">'+
         '<button class="link-btn reset-link" data-reset-filters>Сбросить всё&nbsp; ×</button>'+
         filterSection("Источники",'<label class="check inline-check"><input type="checkbox" data-filter-source="favorite" '+(state.sources.favorite?"checked":"")+'> Любимые</label><label class="check inline-check"><input type="checkbox" data-filter-source="research" '+(state.sources.research?"checked":"")+'> Research</label><label class="check inline-check"><input type="checkbox" data-filter-source="event" '+(state.sources.event?"checked":"")+'> События</label>')+
-        filterSection("Район / город",'<select class="select filter-select"><option>Все районы</option><option>Москва</option><option>МО</option></select>')+
-        '<div class="filter-pair">'+filterMini("Сектор") + filterMini("Класс")+'</div>'+
-        '<div class="filter-pair">'+filterMini("Подтип") + filterMini("Дата")+'</div>'+
+        filterSection("Район / город",'<select class="select filter-select" data-adv-select="district">'+selectOptions(districts,state.filters.district,"Все районы")+'</select>')+
+        '<div class="filter-pair">'+
+          filterMini("Класс","experienceClass",classes,state.filters.experienceClass)+
+          filterMini("Подтип","experienceSubtype",subtypes,state.filters.experienceSubtype)+
+        '</div>'+
         filterSection("Москва / МО",segmented([["moscow","Москва"],["mo","МО"],["","Любой"]],state.quick))+
         filterSection("Один / вместе",segmented([["alone","Один"],["together","Вместе"],["","Любой"]],state.quick))+
         filterSection("День / вечер",segmented([["day","☀ День"],["evening","☾ Вечер"],["","Любое"]],state.quick))+
-        filterSection("Улица / помещение",'<div class="segment"><button type="button">♙ Улица</button><button type="button">⌂ Помещение</button><button class="active" type="button">Любое</button></div>')+
-        filterSection("Цена (₽)",rangeVisual("0","5000","72%"))+
-        filterSection("Время дороги от меня",rangeVisual("0","90 мин","58%"))+
-        filterSection("Полное время (включая дорогу)",rangeVisual("0","8 ч","64%"))+
+        filterSection("Улица / помещение",advSegment("environment",[["Улица","♙ Улица"],["Помещение","⌂ Помещение"],["","Любое"]],state.filters.environment))+
+        filterSection("Цена (₽)",advancedRange("maxPrice",100000,500," ₽"))+
+        filterSection("Время дороги от меня",advancedRange("maxTravel",180,5," мин"))+
+        filterSection("Полное время (включая дорогу)",advancedRange("maxTotalMinutes",720,30," мин"))+
       '</div><div class="filter-column">'+
-        filterSection("Главное состояние",'<div class="state-chip-grid"><button>Любое</button><button>Спокойствие</button><button>Вдохновение</button><button>Активность</button><button>Романтика</button><button>Обучение</button><button>Семейное</button><button>Другое</button></div>')+
+        filterSection("Главное состояние",mainStateFilter())+
         filterSection("Эмоциональные шкалы",emotionFilterVisual())+
-        filterSection("Атмосфера",'<div class="atmo-grid"><button>💧 Вода</button><button>Простор</button><button class="active">Тишина</button><button class="active">Зелень</button><button>▣ Огни</button><button>♫ Музыка</button><button>♨ Фонтаны</button><button>⚒ Архитектура</button></div>')+
+        filterSection("Атмосфера",atmosphereFilterVisual())+
         filterSection("Бесплатно",'<label class="check"><input type="checkbox" data-quick="free" '+(state.quick==="free"?"checked":"")+'> Только бесплатные</label>')+
-        filterSection("Скидка",'<label class="check"><input type="checkbox"> Только со скидкой</label>')+
-        filterSection("Доступность билетов",'<label class="check"><input type="checkbox"> Есть билеты</label><label class="check"><input type="checkbox"> Можно купить на месте</label>')+
+        filterSection("Скидка",'<label class="check"><input type="checkbox" data-adv-check="discountOnly" '+(state.filters.discountOnly?"checked":"")+'> Только со скидкой</label>')+
+        filterSection("Доступность билетов",'<label class="check"><input type="checkbox" data-adv-check="ticketsOnly" '+(state.filters.ticketsOnly?"checked":"")+'> Есть билеты</label><label class="check"><input type="checkbox" data-adv-check="buyOnSite" '+(state.filters.buyOnSite?"checked":"")+'> Можно купить на месте</label>')+
       '</div></div>'+
     '</aside>'+
     '<section class="panel results-panel"><div class="results-toolbar"><div class="results-title">Найдено <b>'+results.length+'</b> варианта</div><div class="toolbar-right"><div class="view-toggle"><button class="active">'+icon("list")+' <span>Списком</span></button><button>'+icon("pin")+' <span>На карте</span></button></div></div></div>'+
-    '<div class="results-subbar"><div class="active-filters">'+(state.searchText?'<span class="active-chip">'+e(state.searchText)+' ×</span>':'')+'<span class="active-chip">Москва и МО ×</span>'+(state.quick?'<span class="active-chip">'+e(state.quick)+' ×</span>':'')+'</div><div class="sort-line"><span>Сортировка:</span><select class="select" id="result-sort"><option value="relevance">Цена с дорогой ↑</option><option value="price">По цене</option><option value="rating">По рейтингу</option><option value="name">По названию</option></select></div></div>'+
+    '<div class="results-subbar"><div class="active-filters">'+
+      (state.searchText?'<span class="active-chip">'+e(state.searchText)+' ×</span>':'')+
+      (state.quick?'<span class="active-chip">'+e(state.quick)+' ×</span>':'')+
+      advancedChips.map(x=>'<span class="active-chip">'+e(x)+' ×</span>').join("")+
+    '</div><div class="sort-line"><span>Сортировка:</span><select class="select" id="result-sort"><option value="relevance">По релевантности</option><option value="price">По цене</option><option value="rating">По рейтингу</option><option value="name">По названию</option></select></div></div>'+
     '<div class="result-head"><span>#</span><span>Место / событие</span><span>Источник</span><span>Район / город</span><span>Цена с дорогой</span><span>Дорога</span><span>Всего</span><span>Рейтинг</span><span>Атмосфера</span><span></span></div>'+
     (rows||'<div class="empty-state">По текущим фильтрам ничего не найдено.</div>')+'</section></div>';
   shell(view,"home",true);
@@ -623,27 +702,22 @@ function renderSearch(){
 function segmented(items,current){
   return '<div class="segment">'+items.map(([key,label])=>'<button type="button" data-quick="'+e(key)+'" class="'+(current===key?"active":"")+'">'+e(label)+'</button>').join("")+'</div>';
 }
-function filterMini(title){
-  return '<div class="filter-mini"><h4>'+e(title)+'</h4><select class="select filter-select"><option>Все</option></select></div>';
+function filterMini(title,key,values,current){
+  return '<div class="filter-mini"><h4>'+e(title)+'</h4><select class="select filter-select" data-adv-select="'+e(key)+'">'+selectOptions(values,current,"Все")+'</select></div>';
 }
 function rangeVisual(min,max,width){
   return '<div class="range-visual"><div class="range-track"><i style="width:'+e(width)+'"></i><b style="left:'+e(width)+'"></b></div><div class="range-inputs"><span>'+e(min)+'</span><span>—</span><span>'+e(max)+'</span></div></div>';
 }
-function emotionFilterVisual(){
-  return [["⚓","Тишина","92%"],["♣","Зелень","92%"],["☾","Красота","42%"],["♡","Уединение","42%"],["⚡","Активность","42%"]].map(x=>
-    '<div class="emotion-filter"><span>'+x[0]+'</span><span>'+x[1]+'</span><div class="mini-slider"><i style="width:'+x[2]+'"></i><b style="left:'+x[2]+'"></b></div><em>Любая</em></div>'
-  ).join("");
-}
 function filterSection(title,body){ return '<div class="filter-section"><h4>'+e(title)+'</h4>'+body+'</div>'; }
 function resultRow(item,type,index){
-  const atmosphere=(Array.isArray(item.atmosphere_tags)&&item.atmosphere_tags.length?item.atmosphere_tags:[item.main_state,item.parent_activity||item.primary_activity]).filter(Boolean).slice(0,4);
+  const atmosphere=atmosphereLabels(item);
   const price=priceFor(item,type);
   const rating=item.rating ?? null;
   return '<article class="result-row" data-detail="'+type+":"+e(item.id)+'"><span class="result-num">'+e(index)+'</span><div class="result-item"><img class="result-thumb" src="'+e(safeImg(item.cover_url))+'" alt="" onerror="this.src=\''+FALLBACK_IMAGE+'\'"><div><div class="result-title">'+e(itemTitle(item,type))+'</div><div class="meta-line">'+icon("pin")+e(item.parent_activity||item.primary_activity||item.category||"")+'</div><div class="meta-line">'+e(item.season||item.time_of_day||"Круглый год")+'</div></div></div>'+
     '<span><span class="source-cell source-'+type+'">'+(type==="favorite"?"⌂":type==="research"?"●":"♜")+' '+e(sourceLabel(type))+'</span></span>'+
     '<span class="result-district">'+e(districtFor(item,type))+'</span><b class="result-price '+(Number(price)===0?"free":"")+'">'+e(money(price))+'</b>'+
     '<span>'+e(type==="research"?(item.travel_one_way_text||"—"):"—")+'</span><span>'+e(type==="research"?(item.total_duration_text||item.duration_on_site_text||"—"):durationFor(item,type))+'</span>'+
-    '<span class="rating">'+(rating!==null?"★ "+e(rating):"—")+'</span><span class="atmo-cell">'+atmosphere.map(t=>'<i>'+e(t)+'</i>').join("")+'</span><span class="heart">♡</span></article>';
+    '<span class="rating">'+(rating!==null?"★ "+e(rating):"—")+'</span><span class="atmo-cell">'+(atmosphere.length?atmosphere.map(t=>'<i>'+e(t)+'</i>').join(""):'<i class="empty-atmo">—</i>')+'</span><span class="heart">♡</span></article>';
 }
 
 function historySearchPanel(){
@@ -900,9 +974,15 @@ root.addEventListener("click",async ev=>{
   if(st){ const k=st.dataset.sourceToggle; state.sources[k]=!state.sources[k]; renderCurrent(); return; }
   const q=ev.target.closest("[data-quick]");
   if(q && q.tagName!=="INPUT"){ state.quick=state.quick===q.dataset.quick?"":q.dataset.quick; if(route().path==="/") go("#/search"); else renderCurrent(); return; }
+  const adv=ev.target.closest("[data-adv-button]");
+  if(adv){ const key=adv.dataset.advButton,value=adv.dataset.advValue||""; state.filters[key]=state.filters[key]===value?"":value; renderSearch(); return; }
+  const atm=ev.target.closest("[data-atmos-filter]");
+  if(atm){ const key=atm.dataset.atmosFilter; state.filters.atmosphere[key]=state.filters.atmosphere[key]?0:1; renderSearch(); return; }
+  const clearRange=ev.target.closest("[data-clear-range]");
+  if(clearRange){ state.filters[clearRange.dataset.clearRange]=null; renderSearch(); return; }
   const exp=ev.target.closest("[data-expand-visit]");
   if(exp){ state.historyExpanded=state.historyExpanded===exp.dataset.expandVisit?null:exp.dataset.expandVisit; renderHistory(); return; }
-  if(ev.target.closest("[data-reset-filters]")){ state.quick="";state.searchText="";state.sources={favorite:true,research:true,event:true};renderSearch();return; }
+  if(ev.target.closest("[data-reset-filters]")){ state.quick="";state.searchText="";state.sources={favorite:true,research:true,event:true};resetAdvancedFilters();renderSearch();return; }
   if(ev.target.closest("#magic-link")){ await sendMagicLink(); return; }
   if(ev.target.closest("#logout")){ await supabase.auth.signOut(); return; }
   if(ev.target.closest("#export-data")){ await exportUserData(); return; }
@@ -913,6 +993,10 @@ root.addEventListener("change",ev=>{
   if(ev.target.matches("[data-filter-source]")){ state.sources[ev.target.dataset.filterSource]=ev.target.checked; renderSearch(); }
   if(ev.target.matches("#result-sort")){ state.resultSort=ev.target.value; renderSearch(); }
   if(ev.target.matches('input[data-quick]')){ state.quick=ev.target.checked?ev.target.dataset.quick:"";renderSearch(); }
+  if(ev.target.matches("[data-adv-select]")){ state.filters[ev.target.dataset.advSelect]=ev.target.value; renderSearch(); }
+  if(ev.target.matches("[data-adv-check]")){ state.filters[ev.target.dataset.advCheck]=ev.target.checked; renderSearch(); }
+  if(ev.target.matches("[data-adv-range]")){ const key=ev.target.dataset.advRange,max=Number(ev.target.max),value=Number(ev.target.value); state.filters[key]=value>=max?null:value; renderSearch(); }
+  if(ev.target.matches("[data-emotion-filter]")){ const key=ev.target.dataset.emotionFilter,value=Number(ev.target.value); if(value) state.filters.emotions[key]=value; else delete state.filters.emotions[key]; renderSearch(); }
 });
 root.addEventListener("submit",async ev=>{
   ev.preventDefault();
