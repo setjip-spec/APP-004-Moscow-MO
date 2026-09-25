@@ -648,25 +648,76 @@ function emotionMarkup(item){
 }
 
 
-function settingToggle(label,help,key){
+function settingsMenuItem(iconText,title,sub,active=false){
+  return '<button type="button" class="setting-menu-btn '+(active?"active":"")+'"><span class="settings-menu-icon">'+iconText+'</span><span><b>'+e(title)+'</b><small>'+e(sub)+'</small></span></button>';
+}
+function settingSwitch(label,help,key){
   const checked=state.settings?.[key]!==false;
-  return '<div class="setting-row"><div><div class="setting-name">'+e(label)+'</div><div class="setting-help">'+e(help)+'</div></div><label class="check"><input type="checkbox" name="'+e(key)+'" '+(checked?"checked":"")+'> Включено</label></div>';
+  return '<label class="setting-switch-row"><span><b>'+e(label)+'</b>'+(help?'<small>'+e(help)+'</small>':'')+'</span><span class="ui-switch"><input type="checkbox" name="'+e(key)+'" '+(checked?"checked":"")+'><i></i></span></label>';
+}
+function sourceSetting(key,label){
+  const checked=state.settings?.[key]!==false;
+  return '<label class="source-setting"><span class="ui-switch"><input type="checkbox" name="'+e(key)+'" '+(checked?"checked":"")+'><i></i></span><span>'+e(label)+'</span></label>';
 }
 function renderSettings(){
   const s=state.settings||{}, amount=state.budgetVersion?.monthly_amount??"";
-  const view='<div class="settings-layout"><aside class="panel settings-menu">'+
-    '<button class="setting-menu-btn active">Основные</button><button class="setting-menu-btn">Поиск</button><button class="setting-menu-btn">Локация и дорога</button><button class="setting-menu-btn">Погода</button><button class="setting-menu-btn">Интерфейс</button>'+
-    '</aside><form class="settings-main" id="settings-form">'+
-      '<section class="panel setting-card"><h3>Бюджет на досуг</h3><div class="setting-row"><div><div class="setting-name">Месячный бюджет</div><div class="setting-help">Новая версия начинает действовать с выбранного месяца и не переписывает прошлое.</div></div><input class="input" name="budget_amount" type="number" min="0" step="100" value="'+e(amount)+'" placeholder="Не задан"></div>'+
-      '<div class="setting-row"><div><div class="setting-name">Действует с месяца</div></div><input class="input" name="budget_month" type="month" value="'+e(isoMonthNow().slice(0,7))+'"></div></section>'+
-      '<section class="panel setting-card"><h3>Поиск по умолчанию</h3>'+settingToggle("Любимые","Искать среди проверенных Favorite","default_favorites")+settingToggle("Research","Искать среди гипотез на проверку","default_research")+settingToggle("События","Искать в Events LIVE","default_events")+settingToggle("Запоминать последний запрос","Сохранять запрос в текущей пользовательской логике","remember_last_query")+settingToggle("Запоминать фильтры","Сохранять выбранные фильтры","remember_last_filters")+
-      '<div class="setting-row"><div><div class="setting-name">Горизонт событий</div></div><input class="input" name="event_horizon_days" type="number" min="1" max="60" value="'+e(s.event_horizon_days??14)+'"></div></section>'+
-      '<section class="panel setting-card"><h3>Локация и дорога</h3><div class="setting-row"><div><div class="setting-name">Базовая точка</div></div><input class="input" name="base_location" value="'+e(s.base_location||"Коптево")+'"></div><div class="setting-row"><div><div class="setting-name">Рабочая область</div></div><select name="working_area"><option value="MOSCOW" '+(s.working_area==="MOSCOW"?"selected":"")+'>Москва</option><option value="MOSCOW_MO" '+(s.working_area!=="MOSCOW"?"selected":"")+'>Москва + МО</option></select></div><div class="setting-row"><div><div class="setting-name">Транспорт</div></div><select name="preferred_transport"><option value="ANY">Любой</option><option value="PUBLIC" '+(s.preferred_transport==="PUBLIC"?"selected":"")+'>Общественный</option><option value="CAR" '+(s.preferred_transport==="CAR"?"selected":"")+'>Автомобиль</option></select></div></section>'+
-      '<section class="panel setting-card"><h3>Погода</h3><div class="setting-row"><div><div class="setting-name">Город</div></div><input class="input" name="weather_city" value="'+e(s.weather_city||"Москва")+'"></div>'+settingToggle("Показывать погоду","Погодный блок на Главной","show_weather")+settingToggle("Прогноз на неделю","7-дневный прогноз","show_week_forecast")+'</section>'+
-      '<section class="panel setting-card"><h3>Интерфейс</h3><div class="setting-row"><div><div class="setting-name">Плотность</div></div><select name="density"><option value="STANDARD">Стандартная</option><option value="COMPACT" '+(s.density==="COMPACT"?"selected":"")+'>Компактная</option></select></div><div class="setting-row"><div><div class="setting-name">Выдача</div></div><select name="default_results_view"><option value="LIST">Список</option><option value="GRID" '+(s.default_results_view==="GRID"?"selected":"")+'>Сетка</option></select></div>'+settingToggle("Изображения","Показывать обложки карточек","show_images")+settingToggle("Эмоциональные шкалы","Показывать числовые шкалы","show_emotion_scales")+settingToggle("Теги атмосферы","Показывать атрибуты атмосферы","show_atmosphere_tags")+'</section>'+
-      '<div class="save-bar"><button class="save-btn" type="submit">'+icon("save")+' Сохранить изменения</button></div></form>'+
-    '<aside class="settings-side"><section class="panel side-card"><h3>Аккаунт</h3><div class="sync-ok">● Синхронизация активна</div><p class="panel-sub">'+e(state.session?.user?.email||"Пользователь")+'</p><button class="action-secondary" id="logout">'+icon("logout")+' Выйти</button></section><section class="panel side-card"><h3>Мои данные</h3><p class="panel-sub">Данные приложения хранятся в Supabase и защищены RLS.</p></section><section class="panel side-card"><h3>О приложении</h3><p class="panel-sub">APP-004 · Москва и МО · v0.3 backend parity</p></section></aside></div>';
+  const currentAmount=state.budget?.allocation_amount??state.budgetVersion?.monthly_amount??null;
+  const effective=(state.budgetVersion?.effective_month||isoMonthNow()).slice(0,7);
+  const view='<div class="settings-layout">'+
+    '<aside class="settings-menu">'+
+      settingsMenuItem("⚙","Основные настройки","Бюджет, поиск, общий режим",true)+
+      settingsMenuItem("⌕","Поиск и выдача","Источники, фильтры, период")+
+      settingsMenuItem("▥","Таблица и колонки","Видимые поля, порядок")+
+      settingsMenuItem("⌖","Местоположение и дорога","Базовая точка, транспорт")+
+      settingsMenuItem("☁","Погода","Город, отображение")+
+      settingsMenuItem("▣","Интерфейс","Внешний вид, формат")+
+      settingsMenuItem("♙","Аккаунт","Профиль, синхронизация")+
+      settingsMenuItem("▤","Данные","Экспорт, сброс настроек")+
+    '</aside>'+
+    '<form class="settings-main" id="settings-form"><div class="settings-heading"><h1>Основные настройки</h1><p>Ключевые параметры приложения. Изменения сохраняются по кнопке «Сохранить».</p></div>'+
+      '<section class="panel setting-card budget-setting-card"><div class="setting-card-title"><span>♟</span><div><h3>Бюджет на досуг / события</h3><p>Задайте комфортную сумму, которую вы планируете тратить на мероприятия, рестораны, развлечения и другие активности.</p></div><div class="setting-info-note">ⓘ Новое значение начнёт действовать с выбранного месяца. Прошлые месяцы не изменяются.</div></div>'+
+        '<div class="budget-setting-grid"><label><span>Сумма бюджета в месяц</span><div class="money-input"><input name="budget_amount" type="number" min="0" step="100" value="'+e(amount)+'" placeholder="Не задан"><b>₽</b></div></label>'+
+        '<label><span>Действует с</span><input class="input" name="budget_month" type="month" value="'+e(effective)+'"></label>'+
+        '<div class="budget-example"><b>Для примера</b><span>Сейчас: '+e(currentAmount===null?"не задан":money(currentAmount))+'</span><span>С выбранного месяца: '+e(amount===""?"не задан":money(amount))+'</span></div></div></section>'+
+      '<section class="panel setting-card"><div class="setting-card-title"><span>⌕</span><div><h3>Быстрые настройки поиска</h3><p>Эти параметры определяют, что показывается по умолчанию на Главной и в поиске.</p></div></div>'+
+        '<div class="search-setting-grid"><div><b>Источники по умолчанию</b><div class="source-settings">'+sourceSetting("default_favorites","Любимые")+sourceSetting("default_research","Research")+sourceSetting("default_events","События")+'</div></div>'+
+        '<label><b>Период событий по умолчанию</b><select name="event_horizon_days" class="input"><option value="7" '+(s.event_horizon_days===7?"selected":"")+'>7 дней</option><option value="14" '+(s.event_horizon_days!==7&&s.event_horizon_days!==30?"selected":"")+'>14 дней</option><option value="30" '+(s.event_horizon_days===30?"selected":"")+'>30 дней</option></select></label>'+
+        '<div class="remember-settings">'+settingSwitch("Сохранять последний запрос","", "remember_last_query")+settingSwitch("Сохранять последние фильтры","", "remember_last_filters")+'</div></div></section>'+
+      '<section class="panel setting-card"><div class="setting-card-title"><span>⌖</span><div><h3>Местоположение и дорога</h3><p>Используется для расчёта времени и удобства маршрутов.</p></div></div>'+
+        '<div class="location-setting-grid"><label><b>Базовая точка</b><div class="location-input">'+icon("pin")+'<input name="base_location" value="'+e(s.base_location||"Коптево")+'"></div></label>'+
+        '<div><b>Рабочая область</b><div class="button-segment"><label><input type="radio" name="working_area" value="MOSCOW" '+(s.working_area==="MOSCOW"?"checked":"")+'>Москва</label><label><input type="radio" name="working_area" value="MOSCOW_MO" '+(s.working_area!=="MOSCOW"?"checked":"")+'>Москва и МО</label></div></div>'+
+        '<div><b>Предпочитаемый транспорт</b><div class="button-segment three"><label><input type="radio" name="preferred_transport" value="ANY" '+(s.preferred_transport==="ANY"?"checked":"")+'>Любой</label><label><input type="radio" name="preferred_transport" value="PUBLIC" '+(s.preferred_transport==="PUBLIC"?"checked":"")+'>Общественный</label><label><input type="radio" name="preferred_transport" value="CAR" '+(s.preferred_transport==="CAR"?"checked":"")+'>Автомобиль</label></div></div></div></section>'+
+      '<section class="panel setting-card"><div class="setting-card-title"><span>🌤️</span><div><h3>Погода</h3><p>Настройте отображение погодного блока.</p></div></div>'+
+        '<div class="weather-settings-grid"><label><b>Город</b><input class="input" name="weather_city" value="'+e(s.weather_city||"Москва")+'"></label>'+settingSwitch("Показывать погоду на Главной","", "show_weather")+settingSwitch("Показывать прогноз на 7 дней","", "show_week_forecast")+'<label class="setting-switch-row disabled"><span><b>Использовать моё текущее местоположение</b><small>В будущем, если будет поддержка.</small></span><span class="ui-switch"><input type="checkbox" disabled><i></i></span></label></div></section>'+
+      '<section class="panel setting-card"><div class="setting-card-title"><span>▣</span><div><h3>Интерфейс</h3><p>Настройте удобный для вас вид приложения.</p></div></div>'+
+        '<div class="interface-settings-grid"><div><b>Компактность выдачи</b><div class="button-segment"><label><input type="radio" name="density" value="COMPACT" '+(s.density==="COMPACT"?"checked":"")+'>Компактно</label><label><input type="radio" name="density" value="STANDARD" '+(s.density!=="COMPACT"?"checked":"")+'>Стандартно</label></div></div>'+
+        '<div><b>Формат результатов по умолчанию</b><div class="button-segment"><label><input type="radio" name="default_results_view" value="LIST" '+(s.default_results_view!=="GRID"?"checked":"")+'>Список</label><label><input type="radio" name="default_results_view" value="GRID" '+(s.default_results_view==="GRID"?"checked":"")+'>Таблица</label></div></div>'+
+        '<div class="interface-toggles">'+settingSwitch("Показывать изображения","", "show_images")+settingSwitch("Показывать эмоциональные шкалы","", "show_emotion_scales")+settingSwitch("Показывать атмосферные теги","", "show_atmosphere_tags")+'</div></div></section>'+
+      '<div class="save-bar"><button class="chip-btn" type="button" data-cancel-settings>Отменить изменения</button><button class="save-btn" type="submit">'+icon("save")+' Сохранить настройки</button></div></form>'+
+    '<aside class="settings-side"><section class="panel side-card account-card"><h3>♙ Аккаунт</h3><div class="account-email">'+e(state.session?.user?.email||"Пользователь")+'<small>Ваш аккаунт</small></div><div class="sync-box">● <b>Данные синхронизированы</b><small>Supabase / RLS</small></div><button class="logout-btn" id="logout">⇥ Выйти</button></section>'+
+      '<section class="panel side-card"><h3>▤ Мои данные</h3><button class="data-action" type="button" id="export-data">⇩ <span><b>Экспортировать мои данные</b><small>Скачать JSON с вашими местами, поездками и настройками.</small></span></button><button class="data-action" type="button" id="reset-interface">↻ <span><b>Восстановить стандартные настройки</b><small>Сбросить базовые настройки интерфейса.</small></span></button></section>'+
+      '<section class="panel side-card"><h3>? Поддержка</h3><div class="support-row"><span>▣ Пользовательская инструкция</span><b>Открыть</b></div><div class="support-row"><span>▢ Обратная связь</span><b>Написать нам</b></div><div class="support-row"><span>⚠ Сообщить о проблеме</span><b>Отправить</b></div></section>'+
+      '<section class="panel side-card about-card"><h3>ⓘ О приложении</h3><div class="about-app"><span class="brand-mark"><svg viewBox="0 0 42 42" fill="currentColor"><path d="M4 37h34v2H4zM8 35V18h4v17zm6 0V9h4v26zm6 0V15h4v20zm6 0V5h4v30zm6 0V21h4v14z"/></svg></span><div><b>Москва и МО</b><small>Планируйте прогулки, открывайте новые места и следите за событиями.</small></div><em>v0.4</em></div></section></aside></div>';
   shell(view,"settings",false);
+}
+async function exportUserData(){
+  const tables=["app004_settings","app004_favorite_projection","app004_research","app004_visits","app004_budget_versions","app004_budget_months","app004_accounting_transactions","app004_commitments","app004_shared_expenses","app004_shared_receivables","app004_payables"];
+  const out={exported_at:new Date().toISOString(),app:"APP-004",data:{}};
+  for(const table of tables){
+    const {data,error}=await supabase.from(table).select("*");
+    if(error){ toast("Экспорт остановлен: "+error.message,true); return; }
+    out.data[table]=data||[];
+  }
+  const blob=new Blob([JSON.stringify(out,null,2)],{type:"application/json"});
+  const url=URL.createObjectURL(blob),a=document.createElement("a");
+  a.href=url;a.download="APP-004-export-"+isoDateMoscow()+".json";document.body.append(a);a.click();a.remove();URL.revokeObjectURL(url);
+  toast("Экспорт подготовлен.");
+}
+async function resetInterfaceSettings(){
+  const patch={default_favorites:true,default_research:true,default_events:true,event_horizon_days:14,remember_last_query:true,remember_last_filters:true,show_weather:true,show_week_forecast:true,density:"STANDARD",default_results_view:"LIST",show_images:true,show_emotion_scales:true,show_atmosphere_tags:true};
+  const {error}=await supabase.from("app004_settings").update(patch).eq("user_id",state.session.user.id);
+  if(error){toast("Не удалось сбросить настройки: "+error.message,true);return;}
+  toast("Базовые настройки интерфейса восстановлены.");await loadAll();renderSettings();
 }
 async function saveSettings(form){
   const fd=new FormData(form), checkboxKeys=["default_favorites","default_research","default_events","remember_last_query","remember_last_filters","show_weather","show_week_forecast","show_images","show_emotion_scales","show_atmosphere_tags"];
@@ -720,6 +771,9 @@ root.addEventListener("click",async ev=>{
   if(ev.target.closest("[data-reset-filters]")){ state.quick="";state.searchText="";state.sources={favorite:true,research:true,event:true};renderSearch();return; }
   if(ev.target.closest("#magic-link")){ await sendMagicLink(); return; }
   if(ev.target.closest("#logout")){ await supabase.auth.signOut(); return; }
+  if(ev.target.closest("#export-data")){ await exportUserData(); return; }
+  if(ev.target.closest("#reset-interface")){ await resetInterfaceSettings(); return; }
+  if(ev.target.closest("[data-cancel-settings]")){ renderSettings(); return; }
 });
 root.addEventListener("change",ev=>{
   if(ev.target.matches("[data-filter-source]")){ state.sources[ev.target.dataset.filterSource]=ev.target.checked; renderSearch(); }
