@@ -6,6 +6,9 @@
 - Visual/UI TZ: https://github.com/setjip-spec/APP-004-Moscow-MO/blob/main/docs/APP-004-VISUAL-TZ.md
 - Source audit: https://github.com/setjip-spec/APP-004-Moscow-MO/blob/main/docs/SOURCE-AUDIT.md
 - Google BACKUP SAFE: https://drive.google.com/drive/folders/1p1bct3c4awajZmnxRG88tOBhqYsUFt3O
+- APP-004 UI workspace: https://drive.google.com/drive/folders/1JJf-7P7Ze2vVLqAZW8GECfiMgy1N4gYb
+- UI references / APPROVED: https://drive.google.com/drive/folders/1uyNeHnu0pqPsM5ZVnigCm0LsvPVEjQ6t
+- Approved Dashboard image: https://drive.google.com/file/d/1rMwv0gL9Xi5CMfGMBKRDJKvrU_uFzetQ/view?usp=drivesdk
 - Source-intake snapshot v0.0: https://drive.google.com/drive/folders/1Mn-lvdy3zm7L96pOrqtX1bdGdudYQ5X6
 
 ## Current status
