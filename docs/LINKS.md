@@ -5,6 +5,7 @@
 - Canonical TZ draft: https://github.com/setjip-spec/APP-004-Moscow-MO/blob/main/docs/APP-004-TZ.md
 - Visual/UI TZ: https://github.com/setjip-spec/APP-004-Moscow-MO/blob/main/docs/APP-004-VISUAL-TZ.md
 - Source audit: https://github.com/setjip-spec/APP-004-Moscow-MO/blob/main/docs/SOURCE-AUDIT.md
+- Backend parity report: https://github.com/setjip-spec/APP-004-Moscow-MO/blob/main/docs/BACKEND-REPORT.md
 - Google BACKUP SAFE: https://drive.google.com/drive/folders/1p1bct3c4awajZmnxRG88tOBhqYsUFt3O
 - APP-004 UI workspace: https://drive.google.com/drive/folders/1JJf-7P7Ze2vVLqAZW8GECfiMgy1N4gYb
 - UI references / APPROVED: https://drive.google.com/drive/folders/1uyNeHnu0pqPsM5ZVnigCm0LsvPVEjQ6t
@@ -17,6 +18,8 @@
 - Source-intake snapshot v0.0: https://drive.google.com/drive/folders/1Mn-lvdy3zm7L96pOrqtX1bdGdudYQ5X6
 
 ## Current status
-Visual/UI kit approved. Fresh canon verified. Core relational schema + canonical data import completed. Next: transactional RPC/budget parity, then frontend. QA-014 remains release soak only.
+Visual/UI kit approved. Fresh canon verified. Core relational schema + canonical data import + transactional backend parity completed. Next: runtime media/integrations, then frontend that reproduces the approved PNG references. QA-014 remains release soak only.
 
 - Backup snapshot v0.2: https://drive.google.com/drive/folders/1XUhJyLo-7HKxDquHuDoo85R4OKXC6yAw
+
+- Backup snapshot v0.3 — BACKEND PARITY: https://drive.google.com/drive/folders/1UaQgrXxvgIT6n8HjqeS2tJJw7XNpweMJ
