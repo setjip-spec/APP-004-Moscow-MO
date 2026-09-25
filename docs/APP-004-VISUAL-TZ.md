@@ -1,6 +1,6 @@
 # APP-004 — Москва и МО
-## VISUAL / UI ТЗ — v0.7
-**Статус:** Desktop Dashboard и Search / Results утверждены; остальные экраны в работе  
+## VISUAL / UI ТЗ — v0.8
+**Статус:** Desktop Dashboard, Search / Results, History и Universal Detail Card утверждены; Mobile и Settings в работе  
 **Дата:** 25.09.2026  
 **APP-ID:** APP-004
 
@@ -530,3 +530,64 @@ https://drive.google.com/file/d/1Qxb4jRrfrDyQyTz2HBpFoUQXsEY0A7IU/view?usp=drive
 **History / История посещений**.
 
 History должна продолжать тот же desktop shell без заметного смещения header, ширины контейнера и сетки.
+
+
+# 21. Утверждённый Desktop History
+
+**Дата утверждения:** 25.09.2026
+
+Файл:
+**APP-004_UI_003_History_Approved_2026-09-25.png**
+
+Google Drive:
+https://drive.google.com/file/d/1lLyHkaBfycYKTQex6JI0afPm8XyfuOJt/view?usp=drivesdk
+
+Зафиксировано:
+- History — отдельная верхнеуровневая вкладка;
+- сохраняется общий desktop shell;
+- слева фильтры истории;
+- справа фактические Visits;
+- Visits группируются по месяцам;
+- строка Visit компактна, подробности раскрываются;
+- фактические расходы отображаются отдельно и не заменяются текущими ценами;
+- поддерживаются поиск, период, фильтры, сортировка, столбцы.
+
+# 22. Утверждённый Universal Detail Card
+
+**Дата утверждения:** 25.09.2026
+
+Файл:
+**APP-004_UI_004_DetailCard_Approved_2026-09-25.png**
+
+Google Drive:
+https://drive.google.com/file/d/1KL60XHyYpLc2QXpeijfvtzcum0KcJvZQ/view?usp=drivesdk
+
+Зафиксировано:
+- большой cover / gallery;
+- заголовок и type badge;
+- rating / статус;
+- краткая информация справа;
+- время на месте / дорога / всего;
+- цена / цена с дорогой;
+- атмосфера и эмоции;
+- плюсы / риски;
+- маршрут;
+- история посещений;
+- пользовательские CTA;
+- адаптация одного шаблона под Favorite / Research / Event.
+
+# 23. Search / Results — как пользователь туда попадает
+
+Search / Results не добавляется четвёртой кнопкой в верхнее меню.
+
+Открывается:
+- глобальным поиском;
+- «Все любимые»;
+- «Все исследования»;
+- «Все события»;
+- расширенными фильтрами.
+
+Верхнее меню остаётся:
+**Главная / История / Настройки**.
+
+Это сделано намеренно, чтобы навигация не разрасталась и Search оставался рабочим контекстным экраном.
