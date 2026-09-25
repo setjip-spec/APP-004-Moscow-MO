@@ -1,57 +1,73 @@
 # APP-004 — Source Intake Audit
 **Дата:** 25.09.2026  
-**Статус:** BLOCKED FOR BACKEND IMPLEMENTATION / UI-SPEC MAY CONTINUE
+**Статус:** FRESH CANON IDENTIFIED / WAITING FOR FRESH USER + TECH FILES
 
-## Получено
-1. `Москва и МО — ОТКРЫВАТЬ СЮДА.xlsx`
-2. `Москва и МО — маршруты и активности.xlsx`
+## Итог контрольной проверки
 
-## Фактическое состояние приложенных файлов
+Внешняя контрольная проверка подтвердила, что текущие Drive-файлы USER + TECH являются внутренне согласованной, но устаревшей парой.
 
-### USER workbook
-Листы: Главная, Исследования, События LIVE, Музыка рядом, Любимые, Маршруты, История, Памятка, Скидки / Price Watch, Бухгалтерия.
+### Текущие Drive-файлы
 
-USER уже содержит пользовательские проекции Favorite / Research / Events LIVE / History / budget.
+USER:
+- старая согласованная версия;
+- отсутствуют более поздние листы:
+  - Обязательства / оплаты
+  - Совместные расходы
+  - Долги людям
+- История заканчивается на AB вместо AL;
+- Бухгалтерия заканчивается на N вместо W.
 
-### TECH workbook
-Обнаружено 40 листов. Последние модули:
-- 36 — LIVE Aging Engine
-- 37 — Deal Price Watch
-- 38 — Deal Priority Alerts
-- 39 — Visit Accounting
-- 40 — Refunds Corrections
+TECH:
+- 40 листов;
+- последний модуль: `40 — Refunds Corrections`;
+- отсутствуют модули:
+  - `41 — Commitments Cash State`
+  - `42 — Deposits Partial Payments`
+  - `43 — Shared Expenses`
+  - `44 — Payables to People`
+  - `45 — App Readiness Gate`
+- `27 — App-only Requirements`: 54 требований, до APP-060;
+- `26 — QA Regression`: 145 QA:
+  - 142 PASS
+  - 2 PENDING
+  - 0 FAIL
+  - 1 SOAK
 
-Листа `45 — App Readiness Gate` в приложенном TECH нет.
+PENDING:
+- QA-013
+- QA-015
 
-`27 — App-only Requirements`: 54 APP-требования, до APP-060 с пропусками в нумерации.
+SOAK:
+- QA-014 Research → Visit
 
-`26 — QA Regression`:
-- 145 QA-записей;
-- 142 PASS;
-- 2 PENDING;
-- 1 SOAK.
+## Более свежий канон
 
-## Расхождение с handoff
-В handoff было указано:
-- 188 QA;
-- 187 PASS;
-- 0 PENDING;
-- 1 SOAK;
-- модули 28–44;
-- `45 — App Readiness Gate`.
+Контрольная проверка подтвердила существование более свежей пары:
+- `Stage7 PAYABLES + APP READINESS USER`
+- `Stage7 PAYABLES + APP READINESS TECH`
 
-Это не совпадает с фактически приложенным TECH workbook.
+В свежем TECH:
+- QA-013 и QA-015 уже закрыты PASS;
+- QA-014 остаётся единственным SOAK;
+- присутствуют модули 41–45;
+- APP requirements доходят до APP-086;
+- APP requirements всего: 80;
+- финальный `45 — App Readiness Gate` разрешает начинать Supabase schema/backend до завершения QA-014.
 
-## Решение
-Можно продолжать сейчас:
-- visual/UI spec;
-- информационную архитектуру;
-- GitHub scaffold.
+Отсутствующие в старом Drive TECH требования:
+- APP-061–066 — commitment/payment state machine, committed free cash, refunds, payment-month accounting;
+- APP-067–072 — partial payments, prepayment, deposits, forfeiture;
+- APP-073–079 — shared expenses, receivables, reimbursements, gift/waiver;
+- APP-080–086 — payables to people, repayments, partial settlement, forgiveness, forecast/overlay.
 
-До уточнения источника нельзя считать утверждёнными:
-- финальную Supabase schema;
-- migrations / transactional functions;
-- backend parity;
-- финальный APP/QA mapping.
+## Вывод
 
-Нужен TECH workbook с 188 QA + App Readiness Gate либо явное подтверждение, что текущий приложенный TECH теперь является новым каноном.
+Текущую Drive-пару **НЕ использовать** для проектирования финальной Supabase schema.
+
+Следующий шаг:
+1. получить свежие `Stage7 PAYABLES + APP READINESS USER/TECH`;
+2. заменить ими source-intake APP-004;
+3. обновить Google BACKUP SAFE snapshot;
+4. пересобрать entity map / enums / FK / constraints / transactions;
+5. после этого можно начинать Supabase/backend;
+6. QA-014 остаётся live SOAK и не блокирует начало backend-разработки.
