@@ -322,6 +322,26 @@ function eventCard(ev){
     '<button class="details-btn" data-detail="event:'+e(ev.id)+'">Подробнее&nbsp; →</button>'+
   '</article>';
 }
+function mobileEvents(events){
+  if(!events.length) return '<div class="empty-state">Актуальных событий пока нет.</div>';
+  return events.slice(0,8).map(ev=>{
+    const d=ev.starts_at?new Date(ev.starts_at):null;
+    const day=d?new Intl.DateTimeFormat("ru-RU",{timeZone:"Europe/Moscow",day:"2-digit"}).format(d):"•";
+    const mon=d?new Intl.DateTimeFormat("ru-RU",{timeZone:"Europe/Moscow",month:"short"}).format(d):"по записи";
+    const wd=d?new Intl.DateTimeFormat("ru-RU",{timeZone:"Europe/Moscow",weekday:"short"}).format(d):"";
+    const price=ev.is_free?0:(ev.current_price??ev.regular_price);
+    return '<article class="mobile-event-slide" data-detail="event:'+e(ev.id)+'">'+
+      '<div class="mobile-event-visual"><img src="'+e(safeImg(ev.cover_url))+'" alt="" loading="lazy" onerror="this.src=\''+FALLBACK_IMAGE+'\'">'+
+        '<div class="mobile-date-badge"><b>'+e(day)+'</b><span>'+e(mon)+'</span><small>'+e(wd)+'</small></div><div class="mobile-heart">♡</div></div>'+
+      '<div class="mobile-event-copy"><div class="event-title">'+e(ev.title)+'</div>'+
+        '<div class="meta-line">'+icon("clock")+e(ev.time_text||"Время уточняется")+'</div>'+
+        '<div class="meta-line">'+icon("pin")+e(districtFor(ev,"event"))+'</div>'+
+        '<div class="event-tags"><span class="badge red">'+e(ev.category||"Событие")+'</span><span class="badge blue">'+e(ev.supports_together===false?"Один":"Вместе")+'</span></div>'+
+        '<div class="mobile-event-price">'+e(money(price))+(ev.availability_status?'<span class="badge green">'+e(ev.availability_status)+'</span>':'')+'</div>'+
+        '<button class="details-btn" data-detail="event:'+e(ev.id)+'">Подробнее&nbsp; →</button></div>'+
+    '</article>';
+  }).join("");
+}
 function groupEvents(events){
   const groups=new Map();
   for(const ev of events.slice(0,16)){
@@ -375,7 +395,7 @@ function weatherMarkup(){
   }
   return '<div class="weather-body"><div class="weather-today-title">Сегодня, '+e(fmtDate(isoDateMoscow(),{day:"numeric",month:"long",weekday:"long"}))+'</div>'+
     '<div class="period-grid">'+ps.map(p=>'<div class="period"><div class="period-name">'+e(p.name)+'</div><div class="weather-icon">'+p.icon+'</div><div class="temp">'+(p.temp>=0?"+":"")+e(p.temp)+'°</div><div class="condition">'+e(p.text)+'</div><div class="precip">Осадки '+e(p.precip)+'%</div></div>').join("")+'</div>'+
-    '<div class="week-title">Прогноз на 7 дней</div>'+week+'</div>';
+    '<div class="week-title">Прогноз на 7 дней</div><div class="week-list">'+week+'</div></div>';
 }
 function renderDashboard(){
   const favorites=state.favorites.slice(0,5), research=state.research.slice(0,6), events=filterItems(state.events,"event").slice(0,14);
@@ -384,7 +404,7 @@ function renderDashboard(){
       '<section class="panel" id="favorites-panel"><div class="panel-head"><div class="panel-title-wrap"><span class="panel-icon">★</span><div><div class="panel-title">Куда сходить</div><div class="panel-sub">Проверенные места • Ваши фавориты</div></div></div><button class="link-btn" data-nav="#/search?source=favorite">Все любимые&nbsp; →</button></div><div class="stack-list">'+(favorites.length?favorites.map(x=>miniCard(x,"favorite")).join(""):'<div class="empty-state">Любимых пока нет.</div>')+'</div></section>'+
       '<section class="panel" id="research-panel"><div class="panel-head"><div class="panel-title-wrap"><span class="panel-icon blue">⌕</span><div><div class="panel-title">Исследовать новое</div><div class="panel-sub">Идеи, которые стоит проверить</div></div></div><button class="link-btn" data-nav="#/search?source=research">Все исследования&nbsp; →</button></div><div class="stack-list">'+(research.length?research.map(x=>miniCard(x,"research")).join(""):'<div class="empty-state">Нет активных исследований.</div>')+'</div></section>'+
     '</div>'+
-    '<section class="panel" id="events-panel"><div class="panel-head"><div class="panel-title-wrap"><span class="panel-icon blue">▣</span><div><div class="panel-title">События — ближайшие 14 дней</div><div class="panel-sub">Актуальные события в Москве и МО</div></div></div><button class="link-btn" data-nav="#/search?source=event">Все события&nbsp; →</button></div><div class="event-list">'+groupEvents(events)+'</div></section>'+
+    '<section class="panel" id="events-panel"><div class="panel-head"><div class="panel-title-wrap"><span class="panel-icon blue">▣</span><div><div class="panel-title">События — ближайшие 14 дней</div><div class="panel-sub desktop-only">Актуальные события в Москве и МО</div></div></div><button class="link-btn" data-nav="#/search?source=event">Все события&nbsp; →</button></div><div class="event-list desktop-event-list">'+groupEvents(events)+'</div><div class="mobile-event-list mobile-only">'+mobileEvents(events)+'</div></section>'+
     '<div class="dash-right">'+
       '<section class="panel" id="budget-panel"><div class="panel-head"><div class="panel-title-wrap"><span class="panel-icon blue">'+icon("wallet")+'</span><div class="panel-title">Бюджет месяца</div></div><button class="link-btn" data-nav="#/settings">Настроить&nbsp; →</button></div>'+budgetMarkup()+'</section>'+
       '<section class="panel" id="weather-panel"><div class="panel-head"><div class="panel-title-wrap"><span class="panel-icon">🌤️</span><div><div class="panel-title">Погода в Москве</div><div class="panel-sub">Источник: Open‑Meteo</div></div></div><button class="link-btn">Открыть на карте&nbsp; →</button></div>'+weatherMarkup()+'</section>'+
