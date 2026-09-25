@@ -1,6 +1,6 @@
 # APP-004 — DATA MODEL v1
 
-**Status:** CORE SCHEMA APPLIED  
+**Status:** CORE SCHEMA + TRANSACTIONAL BACKEND APPLIED  
 **Date:** 2026-09-25  
 **Supabase project:** MINI-APPS-CLOUD  
 **Source of truth:** fresh canonical USER/TECH pair verified on 2026-09-25.
@@ -100,6 +100,8 @@ Every APP-004 table is protected by Row Level Security. The standard policy is:
 
 The frontend receives only the Supabase publishable key. No service-role or database secret is allowed in GitHub Pages.
 
+APP-004 runtime functions use `SECURITY INVOKER`; authenticated RLS is optimized as `(select auth.uid()) = user_id`. Entity ownership is checked for referenced Visit/Event/Commitment/Shared/Receivable/Payable/Correction IDs.
+
 ## Media rule
 
 Google Drive remains the master/recovery library for manually collected images and approved UI references.
@@ -112,18 +114,38 @@ For production web rendering, `app004_media` supports:
 
 Private Drive links must not be used directly as anonymous GitHub Pages image URLs. Production images should be mirrored into a web-readable runtime layer while Drive remains the master copy.
 
-## Next backend steps
+## Transactional backend v0.3
 
-1. Import canonical dictionaries, sectors, sources, places, routes and experiences.
-2. Import Research + Stage6/PASS2 evaluation state.
-3. Import LIVE Series/Occurrences and Deal state.
-4. Import Visits/history and current budget snapshots.
-5. Add transactional RPCs for:
-   - Research → Visit;
-   - accounting posting;
-   - refunds/corrections;
-   - commitments/partial payments;
-   - shared reimbursements;
-   - payables/repayments.
-6. Build frontend against the approved visual kit.
-7. QA-014 is performed as the later real-life soak before final release, not as a pre-code blocker.
+Implemented:
+- immutable/idempotent accounting posting and corrections;
+- append-only monthly budget versions;
+- monthly recalculation, carry, forecasts and immutable close;
+- Research → confirmed Visit;
+- Visit/prepayment reconciliation;
+- commitments, partial payments and cancellation;
+- service prepayment vs refundable security deposit;
+- refund pending vs actual refund;
+- deposit forfeiture;
+- shared expenses / per-person receivables / reimbursements / waivers;
+- payables to people / repayments / forgiveness;
+- shared/payable Visit overlays.
+
+Rollback regression covered the late financial scenarios represented by APP-050…086 / QA-162…202. Production financial tables remained free of synthetic QA rows after rollback.
+
+Security/performance hardening:
+- fixed search_path on APP-004 helper functions;
+- authenticated-only optimized RLS;
+- covering indexes on APP-004 foreign keys;
+- ownership validation inside universal posting RPC;
+- APP-004 no longer appears in advisor warnings for mutable search_path, auth RLS initplan, or unindexed foreign keys.
+
+Detailed status: `docs/BACKEND-REPORT.md`.
+
+## Next implementation steps
+
+1. Prepare runtime media paths from Drive master images into web-readable storage.
+2. Add weather and runtime event integrations without frontend secrets.
+3. Build GitHub Pages frontend against the six approved PNG references.
+4. Connect Search/Results, History, Detail, Settings and Dashboard to Supabase.
+5. Run frontend/backend parity and integration QA.
+6. Perform QA-014 as the final real-life Research → Visit soak before release.
