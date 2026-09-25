@@ -1,24 +1,36 @@
 # APP-004 — Москва и МО — ТЗ
-## DRAFT v0.10 — canonical data imported
+## DRAFT v0.11 — backend parity complete
 
-**Статус:** ТЗ В РАБОТЕ  
+**Статус:** BACKEND PARITY COMPLETE / FRONTEND IMPLEMENTATION NEXT  
 **Дата:** 25.09.2026  
 **DATA MODE target:** Supabase MINI-APPS-CLOUD, реляционная модель  
 **Runtime target:** GitHub Pages
 
 ## Источники и приоритет
 
-До устранения source mismatch использовать приоритет:
+Канон зафиксирован 25.09.2026.
 
-1. актуальный TECH workbook;
-2. актуальный USER workbook;
-3. техническая карта;
-4. профиль восприятия;
-5. общий регламент.
+Приоритет backend-логики:
 
-Контрольная проверка подтвердила: текущие Drive USER/TECH являются устаревшей согласованной парой. Более свежий канон существует в виде `Stage7 PAYABLES + APP READINESS USER/TECH`, где TECH содержит модули 41–45, APP-061–086 и финальный App Readiness Gate. QA-014 остаётся единственным SOAK и не блокирует начало backend-разработки.
+1. актуальный канонический TECH workbook;
+2. актуальный канонический USER workbook;
+3. это ТЗ;
+4. техническая карта / профиль восприятия только там, где они уже отражены в канонической предметной модели.
 
-До получения свежих файлов нельзя применять финальную Supabase migration. После их получения и замены source-intake backend можно начинать без ожидания QA-014.
+**Backend складывается из канонических таблиц и ТЗ.** Нельзя допридумывать финансовые состояния, поля, проводки или бизнес-правила, которых нет в TECH/USER/ТЗ.
+
+Fresh TECH:
+- 45 листов;
+- 188 QA = 187 PASS + 1 SOAK;
+- APP requirements through APP-086;
+- единственный SOAK — QA-014 Research → Visit.
+
+Fresh USER:
+- 13 листов;
+- включает Обязательства / оплаты, Совместные расходы, Долги людям;
+- History и Accounting расширены поздними финансовыми слоями.
+
+Source mismatch устранён. Канонические данные импортированы в Supabase, transactional backend реализован по этому канону.
 
 ## Архитектурные инварианты
 
@@ -229,7 +241,7 @@ https://drive.google.com/file/d/14Z0ir3ptjyUi9vVGQqqx2Ra4_7JVTVKp/view?usp=drive
 
 Все approved references находятся в Google Drive `03_UI_REFERENCE/APPROVED`.
 
-Следующий этап — не визуальный. Нужно разрешить source mismatch по TECH и только после этого фиксировать финальную Supabase-схему и backend parity.
+Визуальная стадия согласования завершена. **Frontend должен повторять утверждённые PNG-референсы**, а не интерпретировать их заново. Visual TZ описывает поведение, адаптивность и детали, которых не видно на статичной картинке.
 
 ### Правило визуальных итераций
 
@@ -258,21 +270,41 @@ Created relational layers:
 
 Detailed mapping: `docs/DATA-MODEL.md`.
 
+## Backend parity — 25.09.2026
+
+Transactional backend реализован и rollback-tested по поздним финансовым требованиям APP-050…086 / QA-162…202.
+
+Готовы:
+- immutable/idempotent AccountingTransactions;
+- versioned monthly budget + carry/forecast/close;
+- Research → confirmed Visit;
+- Visit/prepayment reconciliation;
+- corrections/refunds;
+- commitments / partial payments;
+- prepayment vs security deposit;
+- refund pending / refund received / deposit forfeiture;
+- shared expenses / receivables / reimbursements / waivers;
+- payables / repayments / forgiveness;
+- overpayment guards;
+- Visit overlays for shared/payable state.
+
+Security/performance hardening APP-004:
+- SECURITY INVOKER RPC;
+- ownership checks;
+- optimized authenticated RLS;
+- FK indexes;
+- immutable closed month and append-only ledger.
+
+Подробно: `docs/BACKEND-REPORT.md`.
+
 ## Следующий технический шаг
 
-1. Import canonical source data into APP-004 tables.
-2. Implement transactional RPCs matching APP requirements and QA:
-   - Research → Visit;
-   - Visit/accounting posting;
-   - refunds/corrections;
-   - commitments / partial payments / deposits;
-   - shared reimbursements;
-   - payables / repayments.
-3. Add runtime media path and weather/event integrations.
-4. Build GitHub Pages frontend against approved visual-kit.
-5. Run parity/integration QA.
-6. QA-014 remains the final real-world soak before full release.
-
+1. Runtime media: Drive остаётся master/recovery, production images зеркалируются в web-readable storage.
+2. Weather + Event runtime integrations без секретных ключей во frontend.
+3. Frontend shell и страницы **по шести approved PNG**, с максимально точным повторением композиции, геометрии, плотности и визуального языка.
+4. Подключение реальных Supabase-данных, поиска, фильтров, History, Detail и Settings.
+5. Frontend/backend parity + integration QA.
+6. QA-014 остаётся финальным real-life SOAK перед release.
 
 ## Canonical data import — 25.09.2026
 
@@ -293,4 +325,4 @@ Detailed mapping: `docs/DATA-MODEL.md`.
 
 Отчёт: `docs/IMPORT-REPORT.md`.
 
-Следующий этап: transactional RPC parity + monthly budget functions, затем frontend.
+Transactional RPC parity + monthly budget functions завершены. Следующий этап: runtime media/integrations → frontend по approved references.
