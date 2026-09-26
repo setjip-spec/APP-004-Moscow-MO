@@ -18,8 +18,11 @@
 - Source-intake snapshot v0.0: https://drive.google.com/drive/folders/1Mn-lvdy3zm7L96pOrqtX1bdGdudYQ5X6
 
 ## Current status
-Visual/UI kit approved. Fresh canon verified. Core relational schema + canonical data import + transactional backend parity completed. Next: runtime media/integrations, then frontend that reproduces the approved PNG references. QA-014 remains release soak only.
+Visual/UI kit approved. Fresh canon verified. Schema, canonical import, transactional backend and frontend beta are implemented. Integration QA passed. Next: real content images + authenticated visual acceptance/E2E. QA-014 remains final release soak.
 
 - Backup snapshot v0.2: https://drive.google.com/drive/folders/1XUhJyLo-7HKxDquHuDoo85R4OKXC6yAw
 
 - Backup snapshot v0.3 — BACKEND PARITY: https://drive.google.com/drive/folders/1UaQgrXxvgIT6n8HjqeS2tJJw7XNpweMJ
+
+- Frontend beta report: https://github.com/setjip-spec/APP-004-Moscow-MO/blob/main/docs/FRONTEND-REPORT.md
+- Live GitHub Pages: https://setjip-spec.github.io/APP-004-Moscow-MO/
