@@ -17,6 +17,9 @@ const state = {
   eventFavorites: [],
   pins: [],
   visits: [],
+  musicians: [],
+  musicianVisible: { street: true, metro: true },
+  musicianOpen: { street: true, metro: true },
   settings: null,
   budget: null,
   budgetVersion: null,
@@ -63,6 +66,7 @@ const SVG = {
   history:'<path d="M4 4v6h6"/><path d="M4.8 15a8 8 0 1 0 .2-6"/><path d="M12 7v5l3 2"/>',
   settings:'<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2.8 2.8-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6V21h-4v-.1a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1L4.2 17l.1-.1a1.7 1.7 0 0 0 .3-1.9A1.7 1.7 0 0 0 3 14H3v-4h.1a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9L4.2 7 7 4.2l.1.1a1.7 1.7 0 0 0 1.9.3A1.7 1.7 0 0 0 10 3V3h4v.1a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1L19.8 7l-.1.1a1.7 1.7 0 0 0-.3 1.9A1.7 1.7 0 0 0 21 10h.1v4H21a1.7 1.7 0 0 0-1.6 1z"/>',
   search:'<circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/>',
+  music:'<path d="M9 18V5l10-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="16" cy="16" r="3"/>',
   bookmark:'<path d="M6 3h12v18l-6-4-6 4z"/>',
   map:'<path d="M9 18 3 21V6l6-3 6 3 6-3v15l-6 3-6-3z"/><path d="M9 3v15M15 6v15"/>',
   filter:'<path d="M3 5h18l-7 8v6l-4 2v-8z"/>',
@@ -412,6 +416,7 @@ function headerMarkup(active){
     '<nav class="top-nav">'+
       '<button class="nav-btn '+(active==="home"?"active":"")+'" data-nav="#/">'+icon("home")+'<span>Главная</span></button>'+
       '<button class="nav-btn '+(active==="search"?"active":"")+'" data-nav="#/search">'+icon("search")+'<span>Поиск</span></button>'+
+      '<button class="nav-btn '+(active==="musicians"?"active":"")+'" data-nav="#/musicians">'+icon("music")+'<span>Музыканты</span></button>'+
       '<button class="nav-btn '+(active==="history"?"active":"")+'" data-nav="#/history">'+icon("history")+'<span>История</span></button>'+
       '<button class="nav-btn '+(active==="settings"?"active":"")+'" data-nav="#/settings">'+icon("settings")+'<span>Настройки</span></button>'+
     '</nav>'+
@@ -501,17 +506,19 @@ async function loadAll(){
     state.settings=settings||{};
     applyInterfaceSettings();
     restoreSearchState();
-    const [fp,rs,es,vs,bm,bv,pinRes]=await Promise.all([
+    const [fp,rs,es,vs,bm,bv,pinRes,musicRes]=await Promise.all([
       supabase.from("app004_favorite_projection").select("*").eq("active_verified",true),
       supabase.from("app004_research").select("*").eq("active",true).order("research_code",{ascending:true}),
       supabase.from("app004_event_occurrences").select("*").eq("projection_state","SHOW").order("starts_at",{ascending:true,nullsFirst:false}).limit(80),
       supabase.from("app004_visits").select("*").order("visit_date",{ascending:false,nullsFirst:false}).order("visit_code",{ascending:true}),
       supabase.from("app004_budget_months").select("*").eq("month",isoMonthNow()).maybeSingle(),
       supabase.from("app004_budget_versions").select("*").lte("effective_month",isoMonthNow()).order("effective_month",{ascending:false}).order("created_at",{ascending:false}).limit(1),
-      supabase.from("app004_user_pins").select("*").order("created_at",{ascending:false})
+      supabase.from("app004_user_pins").select("*").order("created_at",{ascending:false}),
+      supabase.from("app004_music_performances").select("*").eq("performance_date",isoDateMoscow()).eq("status","ACTIVE").order("starts_at",{ascending:true,nullsFirst:false}).order("title",{ascending:true})
     ]);
-    for(const x of [fp,rs,es,vs,bm,bv,pinRes]) if(x.error) throw x.error;
+    for(const x of [fp,rs,es,vs,bm,bv,pinRes,musicRes]) if(x.error) throw x.error;
     state.pins=pinRes.data||[];
+    state.musicians=musicRes.data||[];
     const projections=fp.data||[];
     const researchRows=rs.data||[], eventRows=es.data||[];
     const expIds=projections.map(x=>x.experience_id).filter(Boolean);
@@ -1124,6 +1131,87 @@ function resultRow(item,type,index){
     '<span class="rating">'+(rating!==null?"★ "+e(rating):"—")+'</span><span class="atmo-cell">'+(atmosphere.length?atmosphere.map(t=>'<i>'+e(t)+'</i>').join(""):'<i class="empty-atmo">—</i>')+'</span><span class="heart"><button class="entity-heart result-heart '+(isPinned(item,type)?"active":"")+'" data-pin-type="'+e(type)+'" data-pin-id="'+e(item.id)+'">'+(isPinned(item,type)?"♥":"♡")+'</button></span></article>';
 }
 
+
+function musicianCoords(row){
+  if(!row) return null;
+  if(row.latitude===null||row.latitude===undefined||row.longitude===null||row.longitude===undefined) return null;
+  const lat=Number(row.latitude),lng=Number(row.longitude);
+  if(!Number.isFinite(lat)||!Number.isFinite(lng)) return null;
+  if(lat<54||lat>57.2||lng<35||lng>40.7) return null;
+  return [lat,lng];
+}
+function musicianTime(row){
+  if(row.starts_at){
+    const start=fmtDate(row.starts_at,{hour:"2-digit",minute:"2-digit"});
+    const end=row.ends_at?fmtDate(row.ends_at,{hour:"2-digit",minute:"2-digit"}):"";
+    return end?start+" — "+end:start;
+  }
+  return "Время не подтверждено";
+}
+function musicianRow(row){
+  const performer=row.performer_name||row.title||"Исполнитель";
+  const participants=row.participants||"Состав не указан";
+  const music=row.music_style||"Стиль не указан";
+  return '<article class="musician-row">'+
+    '<div class="musician-row-time">'+e(musicianTime(row))+'</div>'+
+    '<div class="musician-row-main"><b>'+e(row.title||performer)+'</b>'+
+      '<span>Кто участвует: '+e(participants)+'</span>'+
+      '<span>Музыка: '+e(music)+'</span>'+
+      '<span>📍 '+e(row.address||row.venue_name||"Адрес не подтверждён")+'</span></div>'+
+    (row.source_url?'<a class="musician-source" href="'+e(safeHref(row.source_url))+'" target="_blank" rel="noopener noreferrer">Источник ↗</a>':'')+
+  '</article>';
+}
+function musicianFolder(kind,title,rows){
+  const open=kind==="STREET"?state.musicianOpen.street:state.musicianOpen.metro;
+  const visible=kind==="STREET"?state.musicianVisible.street:state.musicianVisible.metro;
+  const key=kind==="STREET"?"street":"metro";
+  return '<section class="musician-folder '+(open?"open":"")+'">'+
+    '<div class="musician-folder-head"><button type="button" class="musician-folder-toggle" data-musician-folder="'+key+'">'+
+      '<span class="folder-chevron">'+(open?"⌄":"›")+'</span><span class="folder-icon">♫</span><span><b>'+e(title)+'</b><small>'+rows.length+' сегодня</small></span></button>'+
+      '<label class="musician-layer-toggle"><input type="checkbox" data-musician-layer="'+key+'" '+(visible?"checked":"")+'> <span>На карте</span></label></div>'+
+    (open?'<div class="musician-folder-list">'+(rows.length?rows.map(musicianRow).join(""):'<div class="empty-state">На сегодня подтверждённых выступлений нет.</div>')+'</div>':'')+
+  '</section>';
+}
+async function buildMusicianMap(){
+  const box=document.getElementById("musicians-map");
+  if(!box) return;
+  if(!window.L){ box.innerHTML='<div class="empty-state">Карта не загрузилась.</div>'; return; }
+  const map=L.map(box,{zoomControl:true,preferCanvas:true}).setView([55.7558,37.6176],10);
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19,attribution:'&copy; OpenStreetMap contributors'}).addTo(map);
+  const rows=state.musicians.filter(r=>(r.source_kind==="STREET"?state.musicianVisible.street:state.musicianVisible.metro));
+  const bounds=[];
+  for(const row of rows){
+    const coords=musicianCoords(row);
+    if(!coords) continue;
+    const color=row.source_kind==="STREET"?"#ef8c25":"#7257e9";
+    L.circleMarker(coords,{radius:9,weight:2,color:"#fff",fillColor:color,fillOpacity:1}).addTo(map)
+      .bindPopup('<div class="map-popup"><b>'+e(row.title||row.performer_name||"Музыкант")+'</b><div>'+e(musicianTime(row))+'</div><div>'+e(row.music_style||"")+'</div><div>'+e(row.address||row.venue_name||"")+'</div></div>');
+    bounds.push(coords);
+  }
+  requestAnimationFrame(()=>map.invalidateSize(true));
+  setTimeout(()=>map.invalidateSize(true),120);
+  if(bounds.length===1) map.setView(bounds[0],14);
+  else if(bounds.length>1) map.fitBounds(bounds,{padding:[38,38],maxZoom:14});
+  else map.setView([55.7558,37.6176],10);
+  const status=document.querySelector('[data-map-status="musicians-map"]');
+  if(status) status.textContent=rows.length
+    ?("На карте "+bounds.length+" из "+rows.length+" подтверждённых выступлений сегодня.")
+    :"Оба слоя выключены.";
+}
+function renderMusicians(){
+  const street=state.musicians.filter(x=>x.source_kind==="STREET");
+  const metro=state.musicians.filter(x=>x.source_kind==="METRO");
+  const view='<div class="musicians-page">'+
+    '<section class="panel musicians-title"><div><h1>Музыканты сегодня</h1><p>'+e(todayMoscowLabel())+' • только подтверждённые выступления на сегодня</p></div>'+
+      '<div class="musician-legend"><span class="legend-dot street"></span>Уличные <span class="legend-dot metro"></span>Метро</div></section>'+
+    '<div class="musicians-layout"><aside class="musicians-list">'+
+      musicianFolder("STREET","Уличные музыканты",street)+
+      musicianFolder("METRO","Музыка в метро",metro)+
+    '</aside><section class="panel musicians-map-panel"><div id="musicians-map" class="musicians-map"></div><div class="map-status" data-map-status="musicians-map">Подготавливаю карту…</div></section></div>'+
+  '</div>';
+  shell(view,"musicians",false);
+  setTimeout(()=>buildMusicianMap(),0);
+}
 function historySearchPanel(){
   return '<section class="search-panel history-search-panel"><div class="history-search-top"><div class="search-wrap">'+icon("search")+'<form id="history-search-form"><input class="global-search" id="history-search" placeholder="Поиск по посещениям: место, район, событие, заметка..." value="'+e(state.searchText)+'"></form><div class="search-hint">Например: Парк Горького, выставка, ужин, Красногорск</div></div>'+
     '<div class="history-period"><b>Период</b><select class="select"><option>За всё время</option><option>Этот год</option><option>Последние 3 месяца</option></select></div>'+
@@ -1469,6 +1557,7 @@ function renderCurrent(){
   if(r.path==="/history") renderHistory();
   else if(r.path==="/settings") renderSettings();
   else if(r.path==="/search") renderSearch();
+  else if(r.path==="/musicians") renderMusicians();
   else if(r.path==="/detail") renderDetail();
   else renderDashboard();
 }
@@ -1484,6 +1573,12 @@ root.addEventListener("click",async ev=>{
   }
   const focusMap=ev.target.closest("[data-focus-map]");
   if(focusMap){ document.querySelector("#detail-map")?.scrollIntoView({behavior:"smooth",block:"center"}); return; }
+  const musicFolder=ev.target.closest("[data-musician-folder]");
+  if(musicFolder){
+    const key=musicFolder.dataset.musicianFolder;
+    state.musicianOpen[key]=!state.musicianOpen[key];
+    renderMusicians(); return;
+  }
   const nav=ev.target.closest("[data-nav]");
   if(nav){ ev.preventDefault(); go(nav.dataset.nav); return; }
   const detail=ev.target.closest("[data-detail]");
@@ -1529,6 +1624,11 @@ root.addEventListener("click",async ev=>{
   if(ev.target.closest("[data-cancel-settings]")){ renderSettings(); return; }
 });
 root.addEventListener("change",ev=>{
+  if(ev.target.matches("[data-musician-layer]")){
+    const key=ev.target.dataset.musicianLayer;
+    state.musicianVisible[key]=ev.target.checked;
+    renderMusicians(); return;
+  }
   if(ev.target.matches("[data-filter-source]")){ state.sources[ev.target.dataset.filterSource]=ev.target.checked; renderSearch(); }
   if(ev.target.matches("#result-sort")){ state.resultSort=ev.target.value; renderSearch(); }
   if(ev.target.matches('input[data-quick]')){ state.quick=ev.target.checked?ev.target.dataset.quick:"";renderSearch(); }
@@ -1565,7 +1665,7 @@ async function init(){
       const changed=(state.session?.access_token||"")!==(sessionNow?.access_token||"");
       state.session=sessionNow;
       if(changed && sessionNow){ await loadAll(); }
-      if(!sessionNow){ state.favorites=[];state.research=[];state.events=[];state.eventFavorites=[];state.pins=[];state.visits=[];state.settings=null;state.budget=null; }
+      if(!sessionNow){ state.favorites=[];state.research=[];state.events=[];state.eventFavorites=[];state.pins=[];state.visits=[];state.musicians=[];state.settings=null;state.budget=null; }
       renderCurrent();
     },0);
   });
