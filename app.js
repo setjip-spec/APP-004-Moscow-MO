@@ -47,7 +47,9 @@ const state = {
     repeat: ""
   },
   historyExpanded: null,
-  lastError: ""
+  lastError: "",
+  exportUrl: "",
+  budgetStatus: ""
 };
 
 const SVG = {
@@ -1036,7 +1038,7 @@ function renderSettings(){
       '<section class="panel setting-card budget-setting-card"><div class="setting-card-title"><span>♟</span><div><h3>Бюджет на досуг / события</h3><p>Задайте комфортную сумму, которую вы планируете тратить на мероприятия, рестораны, развлечения и другие активности.</p></div><div class="setting-info-note">ⓘ Новое значение начнёт действовать с выбранного месяца. Прошлые месяцы не изменяются.</div></div>'+
         '<div class="budget-setting-grid"><label><span>Сумма бюджета в месяц</span><div class="money-input"><input name="budget_amount" type="number" min="0" step="100" value="'+e(amount)+'" placeholder="Не задан"><b>₽</b></div></label>'+
         '<label><span>Действует с</span><input class="input" name="budget_month" type="month" value="'+e(effective)+'"></label>'+
-        '<div class="budget-example"><b>Для примера</b><span>Сейчас: '+e(currentAmount===null?"не задан":money(currentAmount))+'</span><span>С выбранного месяца: '+e(amount===""?"не задан":money(amount))+'</span></div></div></section>'+
+        '<div class="budget-example"><b>Текущее состояние</b><span>Сейчас: '+e(currentAmount===null?"не задан":money(currentAmount))+'</span><span>Новое значение: '+e(amount===""?"не задан":money(amount))+'</span><button class="budget-save-btn" type="button" id="save-budget">'+icon("save")+' Сохранить бюджет</button><small class="budget-save-status '+(state.budgetStatus.startsWith("Ошибка")?"error":"")+'">'+e(state.budgetStatus)+'</small></div></div></section>'+
       '<section class="panel setting-card"><div class="setting-card-title"><span>⌕</span><div><h3>Быстрые настройки поиска</h3><p>Эти параметры определяют, что показывается по умолчанию на Главной и в поиске.</p></div></div>'+
         '<div class="search-setting-grid"><div><b>Источники по умолчанию</b><div class="source-settings">'+sourceSetting("default_favorites","Любимые")+sourceSetting("default_research","Research")+sourceSetting("default_events","События")+'</div></div>'+
         '<label><b>Период событий по умолчанию</b><select name="event_horizon_days" class="input"><option value="7" '+(s.event_horizon_days===7?"selected":"")+'>7 дней</option><option value="14" '+(s.event_horizon_days!==7&&s.event_horizon_days!==30?"selected":"")+'>14 дней</option><option value="30" '+(s.event_horizon_days===30?"selected":"")+'>30 дней</option></select></label>'+
@@ -1053,23 +1055,37 @@ function renderSettings(){
         '<div class="interface-toggles">'+settingSwitch("Показывать изображения","", "show_images")+settingSwitch("Показывать эмоциональные шкалы","", "show_emotion_scales")+settingSwitch("Показывать атмосферные теги","", "show_atmosphere_tags")+'</div></div></section>'+
       '<div class="save-bar"><button class="chip-btn" type="button" data-cancel-settings>Отменить изменения</button><button class="save-btn" type="submit">'+icon("save")+' Сохранить настройки</button></div></form>'+
     '<aside class="settings-side"><section class="panel side-card account-card"><h3>♙ Аккаунт</h3><div class="account-email">'+e(state.session?.user?.email||"Пользователь")+'<small>Ваш аккаунт</small></div><div class="sync-box">● <b>Данные синхронизированы</b><small>Supabase / RLS</small></div><button class="logout-btn" id="logout">⇥ Выйти</button></section>'+
-      '<section class="panel side-card"><h3>▤ Мои данные</h3><button class="data-action" type="button" id="export-data">⇩ <span><b>Экспортировать мои данные</b><small>Скачать JSON с вашими местами, поездками и настройками.</small></span></button><button class="data-action" type="button" id="reset-interface">↻ <span><b>Восстановить стандартные настройки</b><small>Сбросить базовые настройки интерфейса.</small></span></button></section>'+
-      '<section class="panel side-card"><h3>? Поддержка</h3><div class="support-row"><span>▣ Пользовательская инструкция</span><b>Открыть</b></div><div class="support-row"><span>▢ Обратная связь</span><b>Написать нам</b></div><div class="support-row"><span>⚠ Сообщить о проблеме</span><b>Отправить</b></div></section>'+
+      '<section class="panel side-card"><h3>▤ Мои данные</h3><button class="data-action" type="button" id="export-data">⇩ <span><b>Экспортировать мои данные</b><small>Скачать JSON с вашими местами, поездками и настройками.</small></span></button><div class="export-download-slot">'+(state.exportUrl?'<a class="export-ready-link" href="'+e(state.exportUrl)+'" download="APP-004-export-'+e(isoDateMoscow())+'.json">⇩ Скачать подготовленный файл</a>':'')+'</div><button class="data-action" type="button" id="reset-interface">↻ <span><b>Восстановить стандартные настройки</b><small>Сбросить базовые настройки интерфейса.</small></span></button></section>'+
       '<section class="panel side-card about-card"><h3>ⓘ О приложении</h3><div class="about-app"><span class="brand-mark"><svg viewBox="0 0 42 42" fill="currentColor"><path d="M4 37h34v2H4zM8 35V18h4v17zm6 0V9h4v26zm6 0V15h4v20zm6 0V5h4v30zm6 0V21h4v14z"/></svg></span><div><b>Москва и МО</b><small>Планируйте прогулки, открывайте новые места и следите за событиями.</small></div><em>v0.4</em></div></section></aside></div>';
   shell(view,"settings",false);
 }
 async function exportUserData(){
-  const tables=["app004_settings","app004_favorite_projection","app004_research","app004_visits","app004_budget_versions","app004_budget_months","app004_accounting_transactions","app004_commitments","app004_shared_expenses","app004_shared_receivables","app004_payables"];
-  const out={exported_at:new Date().toISOString(),app:"APP-004",data:{}};
-  for(const table of tables){
-    const {data,error}=await supabase.from(table).select("*");
-    if(error){ toast("Экспорт остановлен: "+error.message,true); return; }
-    out.data[table]=data||[];
+  const btn=document.querySelector("#export-data");
+  if(btn){btn.disabled=true;btn.dataset.oldText=btn.innerHTML;btn.innerHTML='Подготавливаю экспорт…';}
+  try{
+    const tables=["app004_settings","app004_favorite_projection","app004_research","app004_visits","app004_budget_versions","app004_budget_months","app004_accounting_transactions","app004_commitments","app004_shared_expenses","app004_shared_receivables","app004_payables"];
+    const out={exported_at:new Date().toISOString(),app:"APP-004",data:{}};
+    for(const table of tables){
+      const {data,error}=await supabase.from(table).select("*");
+      if(error) throw error;
+      out.data[table]=data||[];
+    }
+    if(state.exportUrl) URL.revokeObjectURL(state.exportUrl);
+    const blob=new Blob([JSON.stringify(out,null,2)],{type:"application/json;charset=utf-8"});
+    state.exportUrl=URL.createObjectURL(blob);
+    const slot=document.querySelector(".export-download-slot");
+    const filename="APP-004-export-"+isoDateMoscow()+".json";
+    if(slot){
+      slot.innerHTML='<a class="export-ready-link" href="'+e(state.exportUrl)+'" download="'+e(filename)+'">⇩ Скачать подготовленный файл</a>';
+      const link=slot.querySelector("a");
+      if(link) setTimeout(()=>link.click(),0);
+    }
+    toast("Экспорт готов. Если скачивание не началось, нажмите «Скачать подготовленный файл».");
+  }catch(err){
+    toast("Экспорт не выполнен: "+(err?.message||String(err)),true);
+  }finally{
+    if(btn){btn.disabled=false;btn.innerHTML=btn.dataset.oldText||'Экспортировать мои данные';}
   }
-  const blob=new Blob([JSON.stringify(out,null,2)],{type:"application/json"});
-  const url=URL.createObjectURL(blob),a=document.createElement("a");
-  a.href=url;a.download="APP-004-export-"+isoDateMoscow()+".json";document.body.append(a);a.click();a.remove();URL.revokeObjectURL(url);
-  toast("Экспорт подготовлен.");
 }
 async function resetInterfaceSettings(){
   const patch={default_favorites:true,default_research:true,default_events:true,event_horizon_days:14,remember_last_query:true,remember_last_filters:true,show_weather:true,show_week_forecast:true,density:"STANDARD",default_results_view:"LIST",show_images:true,show_emotion_scales:true,show_atmosphere_tags:true};
@@ -1077,6 +1093,34 @@ async function resetInterfaceSettings(){
   if(error){toast("Не удалось сбросить настройки: "+error.message,true);return;}
   toast("Базовые настройки интерфейса восстановлены.");await loadAll();renderSettings();
 }
+async function saveBudgetFromSettings(){
+  const form=document.querySelector("#settings-form");
+  if(!form) return;
+  const fd=new FormData(form);
+  const raw=String(fd.get("budget_amount")||"").trim();
+  const monthBase=String(fd.get("budget_month")||"").trim();
+  if(raw===""){ state.budgetStatus="Ошибка: введите сумму бюджета."; renderSettings(); return; }
+  const amount=Number(raw);
+  if(!Number.isFinite(amount)||amount<0){ state.budgetStatus="Ошибка: сумма должна быть 0 или больше."; renderSettings(); return; }
+  if(!/^\d{4}-\d{2}$/.test(monthBase)){ state.budgetStatus="Ошибка: выберите месяц начала."; renderSettings(); return; }
+  const currentMonth=isoMonthNow().slice(0,7);
+  if(monthBase<currentMonth){ state.budgetStatus="Ошибка: нельзя создавать новую версию бюджета задним числом."; renderSettings(); return; }
+
+  const currentBudget=state.budget?.allocation_amount??state.budgetVersion?.monthly_amount??null;
+  const currentEffective=state.budgetVersion?.effective_month?.slice(0,7)||"";
+  const same=Number(currentBudget)===amount && currentEffective===monthBase;
+  if(!same){
+    const {error}=await supabase.rpc("app004_set_budget_version",{p_effective_month:monthBase+"-01",p_monthly_amount:amount,p_comment:"Сохранено пользователем в Settings APP-004"});
+    if(error){ state.budgetStatus="Ошибка: "+error.message; renderSettings(); return; }
+  }
+  const {error:recalcError}=await supabase.rpc("app004_recalculate_budget_month",{p_month:monthBase+"-01"});
+  if(recalcError){ state.budgetStatus="Ошибка пересчёта: "+recalcError.message; renderSettings(); return; }
+  state.budgetStatus=same?"Бюджет уже сохранён. Пересчёт обновлён.":"Сохранено: "+money(amount)+" с "+monthBase+".";
+  await loadAll();
+  renderSettings();
+  toast(state.budgetStatus);
+}
+
 async function saveSettings(form){
   const fd=new FormData(form), checkboxKeys=["default_favorites","default_research","default_events","remember_last_query","remember_last_filters","show_weather","show_week_forecast","show_images","show_emotion_scales","show_atmosphere_tags"];
   const patch={
@@ -1091,19 +1135,6 @@ async function saveSettings(form){
   for(const k of checkboxKeys) patch[k]=fd.get(k)==="on";
   const {error}=await supabase.from("app004_settings").update(patch).eq("user_id",state.session.user.id);
   if(error){ toast("Не удалось сохранить настройки: "+error.message,true); return; }
-  const budgetRaw=String(fd.get("budget_amount")||"").trim();
-  const currentBudget=state.budget?.allocation_amount??state.budgetVersion?.monthly_amount??null;
-  if(budgetRaw!==""){
-    const amount=Number(budgetRaw);
-    if(currentBudget===null || Number(currentBudget)!==amount){
-      const monthBase=String(fd.get("budget_month")||"").trim();
-      if(!monthBase){ toast("Выберите месяц начала нового бюджета.",true); return; }
-      const month=monthBase+"-01";
-      const {error:be}=await supabase.rpc("app004_set_budget_version",{p_effective_month:month,p_monthly_amount:amount,p_comment:"Из настроек APP-004"});
-      if(be){ toast("Настройки сохранены, но бюджет не обновлён: "+be.message,true); await loadAll(); renderSettings(); return; }
-      await supabase.rpc("app004_recalculate_budget_month",{p_month:month});
-    }
-  }
   toast("Настройки сохранены.");
   await loadAll(); renderSettings();
 }
@@ -1146,6 +1177,7 @@ root.addEventListener("click",async ev=>{
   if(ev.target.closest("[data-reset-filters]")){ state.quick="";state.searchText="";state.sources={favorite:true,research:true,event:true};resetAdvancedFilters();renderSearch();return; }
   if(ev.target.closest("#magic-link")){ await sendMagicLink(); return; }
   if(ev.target.closest("#logout")){ await supabase.auth.signOut(); return; }
+  if(ev.target.closest("#save-budget")){ await saveBudgetFromSettings(); return; }
   if(ev.target.closest("#export-data")){ await exportUserData(); return; }
   if(ev.target.closest("#reset-interface")){ await resetInterfaceSettings(); return; }
   if(ev.target.closest("[data-cancel-settings]")){ renderSettings(); return; }
