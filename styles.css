@@ -325,3 +325,61 @@ body.density-compact .mini-card{min-height:56px;padding:5px 0}body.density-compa
 .musician-folder-list{border-top:1px solid #e3ebf3;padding:0 11px 8px}.musician-row{padding:10px 1px;border-top:1px solid #edf2f6;display:grid;grid-template-columns:72px 1fr;gap:8px;position:relative}.musician-row:first-child{border-top:0}.musician-row-time{font-size:10px;font-weight:700;color:#0d6fd3}.musician-row-main{display:grid;gap:3px;min-width:0}.musician-row-main b{font-size:11.5px;line-height:1.2}.musician-row-main span{font-size:9.5px;color:#607993;line-height:1.25}.musician-source{grid-column:2;color:#0b70d6;text-decoration:none;font-size:9px;width:max-content;margin-top:3px}.musicians-map-panel{padding:10px}.musicians-map{height:760px;width:100%;border:1px solid #d8e4ef;border-radius:10px;overflow:hidden;background:#edf3f8}
 @media (max-width:1100px){.musicians-layout{grid-template-columns:360px minmax(0,1fr)}}
 @media (max-width:820px){.top-nav{grid-template-columns:repeat(5,1fr)!important;gap:4px}.nav-btn{font-size:10px;gap:4px;padding:0 4px}.nav-btn svg{width:16px;height:16px}.musicians-title{display:block}.musician-legend{margin-top:8px}.musicians-layout{display:flex;flex-direction:column}.musicians-list,.musicians-map-panel{width:100%}.musicians-map-panel{order:-1}.musicians-map{height:56vh;min-height:410px}}
+
+
+/* APP-004 acceptance pass 3: metro overlay + event source detail */
+.metro-station-icon{
+  background:transparent!important;
+  border:0!important;
+  width:auto!important;
+  height:auto!important;
+}
+.metro-station-label{
+  display:inline-flex;
+  align-items:center;
+  gap:4px;
+  white-space:nowrap;
+  font-size:11px;
+  line-height:1;
+  font-weight:700;
+  color:#172033;
+  text-shadow:0 1px 2px rgba(255,255,255,.95);
+  transform:translate(-8px,-8px);
+  pointer-events:none;
+}
+.metro-m{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-width:18px;
+  height:18px;
+  padding:0 3px;
+  border-radius:5px;
+  background:#d8232a;
+  color:#fff;
+  font-size:11px;
+  font-weight:900;
+  box-shadow:0 1px 4px rgba(0,0,0,.22);
+  text-shadow:none;
+}
+.metro-name{
+  padding:2px 4px;
+  border-radius:4px;
+  background:rgba(255,255,255,.88);
+  box-shadow:0 1px 3px rgba(0,0,0,.10);
+}
+.metro-badge{
+  background:#fff1f1!important;
+  color:#b51f27!important;
+  border:1px solid #f1b8bb!important;
+  font-weight:800;
+}
+.detail-description{
+  white-space:pre-line;
+}
+.event-source-link{
+  text-decoration:none;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+}
