@@ -23,6 +23,7 @@ const state = {
   quick: "",
   searchText: "",
   resultSort: "relevance",
+  resultView: "list",
   filters: {
     district: "",
     environment: "",
@@ -164,9 +165,10 @@ function priceFor(item,type){
   return item.current_price ?? item.regular_price;
 }
 function districtFor(item,type){
-  if(type==="favorite") return item.district_city||item.nearest_transit||"Москва";
-  if(type==="research") return item.district_city||item.transit_station||"Москва";
-  return item.transit_station||item.geo_scope||"Москва";
+  const pl=item?._place||{};
+  if(type==="favorite") return item.district_city||item.nearest_transit||pl.district_city||pl.nearest_transit||pl.name||"Москва";
+  if(type==="research") return item.district_city||item.transit_station||pl.district_city||pl.nearest_transit||pl.name||"Москва";
+  return item.transit_station||pl.district_city||pl.nearest_transit||item.geo_scope||pl.name||"Москва";
 }
 function durationFor(item,type){
   if(type==="favorite") return item.duration_text||"—";
@@ -176,6 +178,76 @@ function durationFor(item,type){
 function travelFor(item,type){
   if(type==="research") return item.travel_one_way_text||"—";
   return "—";
+}
+function itemPlace(item){
+  return item?._place||null;
+}
+function placeCoords(place){
+  const lat=Number(place?.latitude),lng=Number(place?.longitude);
+  return Number.isFinite(lat)&&Number.isFinite(lng)?[lat,lng]:null;
+}
+function geocodeQuery(place){
+  if(!place) return "";
+  const raw=String(place.address||place.name||"").trim();
+  if(!raw) return "";
+  const scope=String(place.geo_scope||"").toLowerCase().includes("мо")?"Московская область":"Москва";
+  return raw+", "+scope+", Россия";
+}
+function sleep(ms){ return new Promise(resolve=>setTimeout(resolve,ms)); }
+async function geocodePlace(place){
+  if(!place?.id) return null;
+  const existing=placeCoords(place); if(existing) return existing;
+  const query=geocodeQuery(place); if(!query) return null;
+  try{
+    const qs=new URLSearchParams({format:"jsonv2",limit:"3",addressdetails:"1",q:query});
+    const res=await fetch("https://nominatim.openstreetmap.org/search?"+qs,{headers:{Accept:"application/json"}});
+    if(!res.ok) return null;
+    const rows=await res.json();
+    const match=(Array.isArray(rows)?rows:[]).find(x=>/моск/i.test(String(x.display_name||"")));
+    if(!match) return null;
+    const lat=Number(match.lat),lng=Number(match.lon);
+    if(!Number.isFinite(lat)||!Number.isFinite(lng)) return null;
+    const {error}=await supabase.from("app004_places").update({latitude:lat,longitude:lng}).eq("id",place.id);
+    if(error) throw error;
+    place.latitude=lat;place.longitude=lng;
+    return [lat,lng];
+  }catch(err){
+    console.warn("Geocode failed",place?.name,err);
+    return null;
+  }
+}
+function mapPopupHtml(item,type){
+  return '<div class="map-popup"><b>'+e(itemTitle(item,type))+'</b><div>'+e(districtFor(item,type))+'</div><a href="#/detail?type='+encodeURIComponent(type)+'&id='+encodeURIComponent(item.id)+'">Открыть карточку →</a></div>';
+}
+async function buildLeafletMap(containerId,entries,{maxGeocode=20}={}){
+  const box=document.getElementById(containerId);
+  if(!box) return;
+  if(!window.L){ box.innerHTML='<div class="empty-state">Карта не загрузилась. Проверьте соединение.</div>'; return; }
+  const map=L.map(box,{zoomControl:true}).setView([55.7558,37.6176],10);
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19,attribution:'&copy; OpenStreetMap contributors'}).addTo(map);
+  const bounds=[],missing=[];
+  for(const entry of entries){
+    const pl=itemPlace(entry.item),coords=placeCoords(pl);
+    if(coords){
+      L.marker(coords).addTo(map).bindPopup(mapPopupHtml(entry.item,entry.type));
+      bounds.push(coords);
+    }else if(pl?.id) missing.push(entry);
+  }
+  if(bounds.length) map.fitBounds(bounds,{padding:[28,28],maxZoom:14});
+  const status=document.querySelector('[data-map-status="'+containerId+'"]');
+  if(status) status.textContent=missing.length?"Определяю координаты для "+Math.min(maxGeocode,missing.length)+" точек…":"Все доступные точки нанесены.";
+  let done=0;
+  for(const entry of missing.slice(0,maxGeocode)){
+    const coords=await geocodePlace(itemPlace(entry.item));
+    if(coords){
+      L.marker(coords).addTo(map).bindPopup(mapPopupHtml(entry.item,entry.type));
+      bounds.push(coords);done++;
+      if(bounds.length===1) map.setView(coords,13); else map.fitBounds(bounds,{padding:[28,28],maxZoom:14});
+    }
+    if(status) status.textContent="Карта: "+bounds.length+" точек"+(missing.length>maxGeocode?" • ещё координаты будут дозаполнены при следующих открытиях":"");
+    await sleep(1100);
+  }
+  if(status && !bounds.length) status.textContent="Не удалось подтвердить координаты для текущей выборки.";
 }
 function parseNumberList(text){
   if(text===null||text===undefined) return [];
@@ -346,24 +418,29 @@ async function loadAll(){
     ]);
     for(const x of [fp,rs,es,vs,bm,bv]) if(x.error) throw x.error;
     const projections=fp.data||[];
+    const researchRows=rs.data||[], eventRows=es.data||[];
     const expIds=projections.map(x=>x.experience_id).filter(Boolean);
     let exps=[],places=[];
     if(expIds.length){
       const er=await supabase.from("app004_experiences").select("*").in("id",expIds);
       if(er.error) throw er.error; exps=er.data||[];
-      const placeIds=[...new Set(exps.map(x=>x.place_id).filter(Boolean))];
-      if(placeIds.length){
-        const pr=await supabase.from("app004_places").select("*").in("id",placeIds);
-        if(pr.error) throw pr.error; places=pr.data||[];
-      }
+    }
+    const placeIds=[...new Set([
+      ...exps.map(x=>x.place_id),
+      ...researchRows.map(x=>x.place_id),
+      ...eventRows.map(x=>x.place_id)
+    ].filter(Boolean))];
+    if(placeIds.length){
+      const pr=await supabase.from("app004_places").select("*").in("id",placeIds);
+      if(pr.error) throw pr.error; places=pr.data||[];
     }
     const expMap=new Map(exps.map(x=>[x.id,x])), placeMap=new Map(places.map(x=>[x.id,x]));
     state.favorites=projections.map(p=>{
       const ex=expMap.get(p.experience_id)||{}, pl=placeMap.get(ex.place_id)||{};
-      return {...ex,...p,title:pl.name||ex.variant_name||ex.parent_activity||"Без названия",district_city:pl.district_city,nearest_transit:pl.nearest_transit,official_url:pl.official_url};
+      return {...ex,...p,title:pl.name||ex.variant_name||ex.parent_activity||"Без названия",district_city:pl.district_city,nearest_transit:pl.nearest_transit,official_url:pl.official_url,_place:pl};
     });
-    state.research=rs.data||[];
-    state.events=sortLiveEvents((es.data||[]).filter(x=>eventStillCurrent(x)));
+    state.research=researchRows.map(x=>({...x,_place:placeMap.get(x.place_id)||null}));
+    state.events=sortLiveEvents(eventRows.filter(x=>eventStillCurrent(x)).map(x=>({...x,_place:placeMap.get(x.place_id)||null})));
     state.visits=vs.data||[];
     state.budget=bm.data||null;
     state.budgetVersion=(bv.data||[])[0]||null;
