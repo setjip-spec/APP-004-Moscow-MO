@@ -312,3 +312,5 @@ a{color:inherit}
 .result-item.no-image,.result-item.image-failed{grid-template-columns:minmax(0,1fr)}.result-item.image-failed .result-thumb{display:none}
 .mobile-event-slide.no-image{grid-template-columns:1fr;min-width:76%;border:1px solid #e2eaf3;border-radius:9px;padding:10px}.mobile-noimage-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:7px}.mobile-date-inline{font-size:10px;color:#0d6fd3;font-weight:700}.mobile-heart.inline{position:static;width:30px;height:30px;background:#f7faff;border:1px solid #dbe8f4;border-radius:50%;display:grid;place-content:center}
 .detail-hero-grid.no-media{grid-template-columns:1fr}.detail-hero-grid.no-media .detail-copy{max-width:none}.detail-hero-grid.no-media .detail-description{max-width:980px}
+
+body.density-compact .mini-card{min-height:56px;padding:5px 0}body.density-compact .panel-head{padding-top:9px;padding-bottom:6px}body.density-compact .result-row{min-height:56px;padding-top:5px;padding-bottom:5px}body.density-compact .event-card{padding-top:5px!important;padding-bottom:5px!important}body.density-compact .filter-section{padding-top:6px;padding-bottom:6px}
