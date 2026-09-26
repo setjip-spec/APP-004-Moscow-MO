@@ -15,6 +15,7 @@ const state = {
   research: [],
   events: [],
   eventFavorites: [],
+  pins: [],
   visits: [],
   settings: null,
   budget: null,
@@ -22,6 +23,7 @@ const state = {
   weather: null,
   sources: { favorite: true, research: true, event: true },
   quick: "",
+  dashboardQuick: "",
   searchText: "",
   resultSort: "relevance",
   resultView: "list",
@@ -460,17 +462,17 @@ async function loadAll(){
     state.settings=settings||{};
     applyInterfaceSettings();
     restoreSearchState();
-    const [fp,rs,es,vs,bm,bv,ef]=await Promise.all([
+    const [fp,rs,es,vs,bm,bv,pinRes]=await Promise.all([
       supabase.from("app004_favorite_projection").select("*").eq("active_verified",true),
       supabase.from("app004_research").select("*").eq("active",true).order("research_code",{ascending:true}),
       supabase.from("app004_event_occurrences").select("*").eq("projection_state","SHOW").order("starts_at",{ascending:true,nullsFirst:false}).limit(80),
       supabase.from("app004_visits").select("*").order("visit_date",{ascending:false,nullsFirst:false}).order("visit_code",{ascending:true}),
       supabase.from("app004_budget_months").select("*").eq("month",isoMonthNow()).maybeSingle(),
       supabase.from("app004_budget_versions").select("*").lte("effective_month",isoMonthNow()).order("effective_month",{ascending:false}).order("created_at",{ascending:false}).limit(1),
-      supabase.from("app004_event_favorites").select("*")
+      supabase.from("app004_user_pins").select("*").order("created_at",{ascending:false})
     ]);
-    for(const x of [fp,rs,es,vs,bm,bv,ef]) if(x.error) throw x.error;
-    state.eventFavorites=ef.data||[];
+    for(const x of [fp,rs,es,vs,bm,bv,pinRes]) if(x.error) throw x.error;
+    state.pins=pinRes.data||[];
     const projections=fp.data||[];
     const researchRows=rs.data||[], eventRows=es.data||[];
     const expIds=projections.map(x=>x.experience_id).filter(Boolean);
@@ -563,6 +565,41 @@ function eventFavoriteRow(ev){
   return state.eventFavorites.find(x=>x.occurrence_id===ev.id)||null;
 }
 function isEventFavorite(ev){ return !!eventFavoriteRow(ev); }
+function pinTarget(item,type){
+  if(!item) return null;
+  if(type==="favorite") return {entity_type:"favorite",entity_id:item.id};
+  if(type==="research") return {entity_type:"research",entity_id:item.id};
+  if(type==="event"){
+    if(eventSeriesIsRecurring(item)&&item.series_id) return {entity_type:"event_series",entity_id:item.series_id};
+    return {entity_type:"event_occurrence",entity_id:item.id};
+  }
+  return null;
+}
+function pinRow(item,type){
+  const target=pinTarget(item,type);
+  if(!target) return null;
+  return state.pins.find(x=>x.entity_type===target.entity_type&&x.entity_id===target.entity_id)||null;
+}
+function isPinned(item,type){ return !!pinRow(item,type); }
+function sortPinned(items,type){
+  return [...items].sort((a,b)=>Number(isPinned(b,type))-Number(isPinned(a,type)));
+}
+async function togglePin(item,type){
+  const target=pinTarget(item,type);
+  if(!target) return;
+  const existing=pinRow(item,type);
+  if(existing){
+    const {error}=await supabase.from("app004_user_pins").delete().eq("id",existing.id);
+    if(error){ toast("Не удалось убрать из избранного: "+error.message,true); return; }
+    state.pins=state.pins.filter(x=>x.id!==existing.id);
+  }else{
+    const {data,error}=await supabase.from("app004_user_pins").insert({user_id:state.session.user.id,...target}).select("*").single();
+    if(error){ toast("Не удалось добавить в избранное: "+error.message,true); return; }
+    state.pins.unshift(data);
+  }
+  renderCurrent();
+}
+
 async function toggleEventFavorite(ev){
   if(!ev) return;
   const existing=eventFavoriteRow(ev);
@@ -1435,7 +1472,7 @@ async function init(){
       const changed=(state.session?.access_token||"")!==(sessionNow?.access_token||"");
       state.session=sessionNow;
       if(changed && sessionNow){ await loadAll(); }
-      if(!sessionNow){ state.favorites=[];state.research=[];state.events=[];state.eventFavorites=[];state.visits=[];state.settings=null;state.budget=null; }
+      if(!sessionNow){ state.favorites=[];state.research=[];state.events=[];state.eventFavorites=[];state.pins=[];state.visits=[];state.settings=null;state.budget=null; }
       renderCurrent();
     },0);
   });
