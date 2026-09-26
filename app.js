@@ -18,6 +18,8 @@ const state = {
   pins: [],
   visits: [],
   musicians: [],
+  metroStations: [],
+  metroStationsPromise: null,
   musicianVisible: { street: true, metro: true },
   musicianOpen: { street: true, metro: true },
   settings: null,
@@ -275,6 +277,64 @@ async function geocodePlace(place){
   // The browser must never guess/write map coordinates.
   return placeCoords(place);
 }
+
+async function loadMetroStations(){
+  if(state.metroStations.length) return state.metroStations;
+  if(state.metroStationsPromise) return state.metroStationsPromise;
+  state.metroStationsPromise=(async()=>{
+    const query='[out:json][timeout:20];nwr["railway"="station"]["station"="subway"](54.7,35.0,57.3,40.8);out center tags;';
+    const endpoints=[
+      "https://overpass-api.de/api/interpreter",
+      "https://overpass.kumi.systems/api/interpreter"
+    ];
+    for(const endpoint of endpoints){
+      try{
+        const res=await fetch(endpoint+"?data="+encodeURIComponent(query),{headers:{Accept:"application/json"}});
+        if(!res.ok) throw new Error("Overpass "+res.status);
+        const json=await res.json();
+        const seen=new Set(), stations=[];
+        for(const x of json.elements||[]){
+          const lat=Number(x.lat ?? x.center?.lat), lng=Number(x.lon ?? x.center?.lon);
+          const name=x.tags?.["name:ru"]||x.tags?.name||"";
+          if(!name||!Number.isFinite(lat)||!Number.isFinite(lng)) continue;
+          const key=name.toLowerCase()+"|"+lat.toFixed(4)+"|"+lng.toFixed(4);
+          if(seen.has(key)) continue;
+          seen.add(key); stations.push({name,lat,lng});
+        }
+        state.metroStations=stations;
+        return stations;
+      }catch(err){ console.warn("Metro layer source failed",endpoint,err); }
+    }
+    return [];
+  })();
+  return state.metroStationsPromise;
+}
+async function addMetroStationsLayer(map){
+  if(!map||!window.L) return;
+  const stations=await loadMetroStations();
+  if(!stations.length) return;
+  const layer=L.layerGroup().addTo(map);
+  const render=()=>{
+    layer.clearLayers();
+    const bounds=map.getBounds().pad(0.08);
+    for(const s of stations){
+      if(!bounds.contains([s.lat,s.lng])) continue;
+      const html='<div class="metro-station-label"><span class="metro-m">M</span><span class="metro-name">'+e(s.name)+'</span></div>';
+      const marker=L.marker([s.lat,s.lng],{
+        interactive:false,
+        keyboard:false,
+        icon:L.divIcon({className:"metro-station-icon",html,iconSize:null,iconAnchor:[10,10]})
+      });
+      marker.addTo(layer);
+    }
+  };
+  render();
+  map.on("moveend zoomend",render);
+}
+function confirmedMetro(item){
+  const pl=itemPlace(item);
+  return item?.transit_station||item?.nearest_transit||pl?.nearest_transit||"";
+}
 function mapPopupHtml(item,type){
   return '<div class="map-popup"><b>'+e(itemTitle(item,type))+'</b><div>'+e(itemMapLabel(item,type))+'</div><a href="#/detail?type='+encodeURIComponent(type)+'&id='+encodeURIComponent(item.id)+'">Открыть карточку →</a></div>';
 }
@@ -288,6 +348,7 @@ async function buildLeafletMap(containerId,entries,{maxGeocode=0}={}){
     maxZoom:19,
     attribution:'&copy; OpenStreetMap contributors'
   }).addTo(map);
+  addMetroStationsLayer(map);
 
   const bounds=[],missing=[];
   const addPoint=(entry,coords)=>{
@@ -1174,6 +1235,7 @@ async function buildMusicianMap(){
   if(!window.L){ box.innerHTML='<div class="empty-state">Карта не загрузилась.</div>'; return; }
   const map=L.map(box,{zoomControl:true,preferCanvas:true}).setView([55.7558,37.6176],10);
   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19,attribution:'&copy; OpenStreetMap contributors'}).addTo(map);
+  addMetroStationsLayer(map);
   const rows=state.musicians.filter(r=>(r.source_kind==="STREET"?state.musicianVisible.street:state.musicianVisible.metro));
   const bounds=[];
   for(const row of rows){
@@ -1352,10 +1414,13 @@ function renderDetail(){
   const title=itemTitle(item,type), price=priceFor(item,type);
   const tags=[item.main_state,item.parent_activity||item.primary_activity||item.category,...(item.atmosphere_tags||[])].filter(Boolean).slice(0,11);
   const visitHistory=state.visits.filter(v=>(type==="research"&&v.research_id===id)||(type==="favorite"&&v.experience_id===id)||(type==="event"&&v.event_occurrence_id===id)).slice(0,4);
-  const actionUrl=safeHref(type==="event"?(item.purchase_url||item.reservation_url||item.listing_url):type==="research"?item.source_url:item.official_url);
-  const mapUrl=safeHref(item.map_url||item.route_map_url);
+  const actionUrl=safeHref(type==="event"?(item.purchase_url||item.reservation_url):type==="research"?item.source_url:item.official_url);
+  const eventSourceUrl=type==="event"?safeHref(item.source_url||item.listing_url):"";
   const primaryLabel=type==="event"?"Билет / запись":type==="research"?"Открыть источник":"Запланировать посещение";
-  const description=item.profile_text||item.profile_reason||item.hypothesis||item.description||item.comment||item.result_summary||"Описание будет дополняться подтверждёнными данными.";
+  const description=type==="event"
+    ?(item.source_description||item.description||item.profile_text||item.profile_reason||item.comment||"Подробное описание пока не получено из подтверждённого источника.")
+    :(item.profile_text||item.profile_reason||item.hypothesis||item.description||item.comment||item.result_summary||"Описание будет дополняться подтверждёнными данными.");
+  const metro=confirmedMetro(item);
   const why=item.profile_reason||item.what_to_check||item.hypothesis||item.best_configuration||"Нет отдельной подтверждённой записи.";
   const downside=item.avoid_conditions||item.weak_window||item.possible_downside||item.comment||"Нет отдельной подтверждённой записи.";
   const lastVisit=visitHistory[0]||null;
@@ -1367,6 +1432,7 @@ function renderDetail(){
   const actions=(actionUrl
     ?'<a class="detail-primary-action" href="'+e(actionUrl)+'" target="_blank" rel="noopener noreferrer">▣ '+e(primaryLabel)+'</a>'
     :'<button class="detail-primary-action" disabled>▣ '+e(primaryLabel)+'</button>')+
+    (type==="event"&&eventSourceUrl?'<a class="detail-soft-action event-source-link" href="'+e(eventSourceUrl)+'" target="_blank" rel="noopener noreferrer">↗ Ссылка на мероприятие</a>':'')+
     '<button class="detail-soft-action pin-detail '+(isPinned(item,type)?"active":"")+'" data-pin-type="'+e(type)+'" data-pin-id="'+e(item.id)+'">'+(isPinned(item,type)?"♥ В избранном":"♡ В избранное")+'</button><button class="detail-soft-action">⌯ Поделиться</button><button class="detail-icon-action">⋮</button>';
 
   const view='<div class="detail-page">'+
@@ -1374,13 +1440,13 @@ function renderDetail(){
       '<div class="detail-hero-grid '+(mediaUrl?"has-media":"no-media")+'">'+(mediaUrl?'<div class="detail-gallery"><div class="hero-wrap"><img class="hero-img" src="'+galleryImg+'" alt="" onerror="this.closest(\'.detail-gallery\')?.remove()"><button class="gallery-arrow left">‹</button><button class="gallery-arrow right">›</button><span class="gallery-count">1</span></div><div class="gallery-strip"><img src="'+galleryImg+'" alt=""></div></div>':'')+
       '<div class="detail-copy"><div class="detail-topline"><span class="badge blue">★ '+e(sourceLabel(type))+'</span><span class="detail-rating">★ <b>'+e(item.rating||"—")+'</b><small>'+e(item.rating?"оценка":"нет оценки")+'</small></span></div>'+
         '<div class="detail-name">'+e(title)+'</div><div class="detail-kind">'+e(item.parent_activity||item.primary_activity||item.category||"")+'</div>'+
-        '<div class="detail-context"><span>'+icon("pin")+e(districtFor(item,type))+'</span><span class="badge gray">'+e(item.environment||"")+'</span><span class="badge gray">'+e(item.social_format||"Для всех")+'</span></div>'+
+        '<div class="detail-context"><span>'+icon("pin")+e(districtFor(item,type))+'</span>'+(metro?'<span class="badge metro-badge">M '+e(metro)+'</span>':'')+'<span class="badge gray">'+e(item.environment||"")+'</span><span class="badge gray">'+e(item.social_format||"Для всех")+'</span></div>'+
         '<div class="detail-labels">'+tags.map((t,i)=>'<span class="badge '+(["orange","blue","violet","red","green"][i%5])+'">'+e(t)+'</span>').join("")+'</div>'+
         '<p class="detail-description">'+e(description)+'</p>'+detailExplanationMarkup(item,type)+'<div class="detail-actions">'+actions+'</div></div></div></section>'+
       '<div class="detail-lower"><section class="panel emotions-card"><div class="detail-section-title">Главное состояние и эмоции <span>?</span></div><div class="main-state-box"><b>'+e(item.main_state||"Главное состояние не указано")+'</b><small>'+e(item.parent_activity||item.primary_activity||"")+'</small></div>'+emotionMarkup(item)+'<h4>Атмосфера</h4><div class="detail-labels">'+tags.slice(1).map(t=>'<span class="badge blue">'+e(t)+'</span>').join("")+'</div></section>'+
         '<div class="detail-center-stack"><section class="panel pros-cons"><div><h3>👍 Почему стоит идти</h3>'+bulletText(why,"good")+'</div><div><h3>⚠ Что может не понравиться</h3>'+bulletText(downside,"bad")+'</div></section>'+
-          '<section class="panel route-card"><h3>📍 Как добраться</h3><div class="route-options">'+routeOption("На метро",districtFor(item,type),road)+routeOption("На авто","Маршрут рядом","~ 35 мин")+routeOption("Общественный транспорт","Автобусы, электробусы",road)+'</div><div class="route-bottom">'+(mapUrl?'<a class="outline-btn" href="'+e(mapUrl)+'" target="_blank" rel="noopener noreferrer">⌖ Показать маршрут на карте</a>':'<button class="outline-btn" type="button" data-focus-map>⌖ Показать на карте</button>')+'<div class="detail-map-wrap"><div id="detail-map" class="detail-map"></div><div class="map-status" data-map-status="detail-map">Подготавливаю карту…</div></div></div></section></div>'+
-        '<aside class="detail-right-stack"><section class="panel detail-summary"><h3>Краткая информация</h3>'+summaryRow("▣","Цена",money(price))+summaryRow("▣","С дорогой (примерно)",money(price))+summaryRow("◷","Время на месте",durationFor(item,type))+summaryRow("🚙","Время дороги",road)+summaryRow("◷","Всего времени",totalTime)+'<hr>'+summaryRow("☀","Лучше всего",item.best_window||item.time_of_day||"День / Вечер")+summaryRow("♟","Один / Вместе",item.social_format||"Для всех")+summaryRow("❉","Сезон",item.season||"Круглый год")+'</section>'+
+          '<section class="panel route-card"><h3>📍 Как добраться</h3><div class="route-options">'+routeOption("На метро",metro||"Метро не подтверждено",road)+routeOption("На авто","Маршрут рядом","~ 35 мин")+routeOption("Общественный транспорт","Автобусы, электробусы",road)+'</div><div class="route-bottom"><div class="detail-map-wrap"><div id="detail-map" class="detail-map"></div><div class="map-status" data-map-status="detail-map">Подготавливаю карту…</div></div></div></section></div>'+
+        '<aside class="detail-right-stack"><section class="panel detail-summary"><h3>Краткая информация</h3>'+summaryRow("▣","Цена",money(price))+summaryRow("▣","С дорогой (примерно)",money(price))+summaryRow("◷","Время на месте",durationFor(item,type))+summaryRow("🚙","Время дороги",road)+summaryRow("◷","Всего времени",totalTime)+(metro?summaryRow("M","Метро",metro):"")+'<hr>'+summaryRow("☀","Лучше всего",item.best_window||item.time_of_day||"День / Вечер")+summaryRow("♟","Один / Вместе",item.social_format||"Для всех")+summaryRow("❉","Сезон",item.season||"Круглый год")+'</section>'+
           '<section class="panel detail-history-side"><div class="side-head"><h3>▣ История посещений</h3><button class="link-btn" data-nav="#/history">Все посещения →</button></div>'+detailVisitHistory(visitHistory)+'</section>'+
           '<section class="panel repeat-card"><h3>↻ Повторить?</h3><strong>'+e(repeatText)+'</strong><p>'+e(lastVisit?.conclusion||"Решение появится после подтверждённого Visit.")+'</p></section></aside>'+
       '</div></div></div>';
