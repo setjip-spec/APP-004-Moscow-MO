@@ -616,8 +616,11 @@ function emotionFilterVisual(){
 function atmosphereFilterVisual(){
   const defs=[["💧","Вода","water"],["♣","Зелень","greenery"],["▣","Огни","lights"],["♫","Музыка","music"],["♨","Фонтаны","fountains"],["◫","Простор","panorama"],["☾","Спокойствие","calm"],["⚒","Архитектура","architecture"]];
   return '<div class="atmo-grid">'+defs.map(([ic,label,key])=>{
-    if(key==="architecture") return '<button type="button" disabled class="unsupported" title="В текущем каноне нет заполненного architecture-тега">'+ic+' '+e(label)+' · нет данных</button>';
-    return '<button type="button" data-atmos-filter="'+e(key)+'" class="'+(state.filters.atmosphere[key]?"active":"")+'" title="По существующему каноническому полю">'+ic+' '+e(label)+'</button>';
+    const unsupported=key==="architecture";
+    const attrs=unsupported?'disabled':'data-atmos-filter="'+e(key)+'"';
+    const cls=(state.filters.atmosphere[key]?"active ":"")+(unsupported?"unsupported":"");
+    const title=unsupported?"В текущем каноне нет заполненного architecture-тега":"По существующему каноническому полю";
+    return '<button type="button" '+attrs+' class="'+cls+'" title="'+e(title)+'">'+ic+' '+e(label)+(unsupported?" · нет данных":"")+'</button>';
   }).join("")+'</div>';
 }
 function activeAdvancedFilterChips(){
