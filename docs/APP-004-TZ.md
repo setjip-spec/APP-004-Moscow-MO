@@ -1,7 +1,7 @@
 # APP-004 — Москва и МО — ТЗ
-## DRAFT v0.14 — acceptance fixes implemented
+## DRAFT v0.15 — search/dashboard separation + universal favorites
 
-**Статус:** FRONTEND BETA / ACCEPTANCE FIXES IMPLEMENTED / BROWSER QA NEXT  
+**Статус:** FRONTEND BETA / ACCEPTANCE PASS 2 IMPLEMENTED / BROWSER QA NEXT  
 **Дата:** 26.09.2026  
 **DATA MODE target:** Supabase MINI-APPS-CLOUD, реляционная модель  
 **Runtime target:** GitHub Pages
@@ -570,3 +570,108 @@ Ingestion обязан:
 8. Проверить mobile после добавления четвёртой вкладки Search.
 9. После визуального прохода — pixel/layout corrections.
 10. Финальный QA-014 Research → Visit SOAK остаётся release gate.
+
+
+# 30. User acceptance pass 2 — 26.09.2026
+
+Этот раздел фиксирует следующий пользовательский проход и заменяет противоречащие части разделов 28–29.
+
+## 30.1 Один Event update вместо двух задач
+
+- Отдельная hourly automation `APP-004 Events Sync` отключена.
+- Рабочий контур должен использовать **одну** задачу: `Москва — события и скидки`.
+- Эта же задача за один запуск:
+  1. ищет/проверяет события;
+  2. обновляет канонический TECH Excel;
+  3. синхронизирует пользовательский Excel;
+  4. в этом же проходе делает idempotent upsert изменившихся Event Series / Occurrences в Supabase.
+- Отдельный второй poll/sync запрещён, чтобы не расходовать лимит пользовательских задач/обновлений.
+- Supabase остаётся runtime-источником приложения; Excel остаётся каноническим staging/master для event-discovery.
+
+## 30.2 Dashboard и Search имеют независимые состояния фильтров
+
+Dashboard использует только собственные quick filters:
+- Сегодня;
+- Завтра;
+- Выходные;
+- 14 дней;
+- Один;
+- Вместе;
+- День;
+- Вечер;
+- Москва;
+- МО;
+- Бесплатно.
+
+Правила:
+- Search query, Search source toggles, Search advanced filters и Search sort **не изменяют Dashboard**.
+- Dashboard quick filters не изменяют Search advanced state.
+- На Dashboard удалена кнопка «Ещё фильтры». Полный поиск открывается отдельной верхней вкладкой **Поиск**.
+- Строка поиска на Dashboard только передаёт введённый запрос на страницу Search и сама не фильтрует Dashboard.
+- Dashboard всегда показывает три продуктовых блока; source toggles существуют только в Search.
+
+## 30.3 Универсальное пользовательское «Избранное»
+
+Сердце обязано работать:
+- в Favorite карточках Dashboard;
+- в Research карточках Dashboard;
+- в Event карточках Dashboard;
+- в каждой строке Search;
+- в Universal Detail;
+- в mobile Event cards.
+
+Хранение:
+- новая RLS-таблица `app004_user_pins`;
+- типы: `favorite`, `research`, `event_series`, `event_occurrence`;
+- recurring Event закрепляется на series-level, one-off — на occurrence-level;
+- Favorite использует стабильный Experience ID;
+- Research использует Research ID.
+
+Поведение:
+- закреплённые сущности поднимаются наверх соответствующего блока Dashboard;
+- в Search при сортировке «по релевантности» закреплённые строки идут первыми;
+- пользователь может снять закрепление повторным нажатием;
+- после F5 состояние должно сохраняться через Supabase;
+- семантический Favorite из профиля и пользовательское «закрепить наверх» — разные понятия, их не смешивать.
+
+## 30.4 Карты — исправление координат и размера
+
+Найден конкретный frontend-дефект: `Number(null) === 0`, поэтому пустые `latitude/longitude` ошибочно трактовались как координаты `[0,0]`. При наличии хотя бы одной такой строки Leaflet уводил viewport из Москвы, тогда как пустая выдача оставалась на Москве.
+
+Исправление:
+- null/empty/invalid/0,0 не считаются координатами;
+- Search map остаётся центрированной на Москве до появления подтверждённых точек;
+- confirmed/geocoded points отображаются как circle markers;
+- один marker → zoom 13;
+- несколько → fitBounds с padding;
+- после mount выполняется `invalidateSize`;
+- отсутствующие координаты продолжают лениво geocode/backfill в Places;
+- Detail map увеличена до полноценного рабочего блока, а не мини-превью.
+
+## 30.5 Universal Detail — обязательное пояснение
+
+При открытии Place / Favorite / Research / Event пользователь должен сразу видеть три коротких блока:
+
+1. **Что это** — формат/класс/среда/локация из канонических полей.
+2. **Что я здесь получу** — главное состояние, самые сильные заполненные эмоциональные шкалы и подтверждённые атмосферные признаки.
+3. **Почему мне может понравиться** — profile reason / hypothesis / what to check / best configuration или другой существующий канонический reason.
+
+Запрещено генерировать псевдоописание из воздуха. Если конкретный reason отсутствует — UI честно сообщает, что отдельное подтверждённое поле пока не заполнено.
+
+## 30.6 Цена
+
+- Платные price labels на карточках и в Search должны быть визуально **красными / хорошо заметными**.
+- Бесплатное остаётся зелёным.
+- Нейтральный серый цвет для основной цены больше не используется.
+
+## 30.7 Release QA additions
+
+Дополнительно проверить в браузере:
+- Search filters не меняют Dashboard после возврата на Главную;
+- Dashboard quick filters не меняют Search state;
+- heart на Favorite / Research / Event / Search row / Detail → F5 → состояние сохранено;
+- закреплённые сущности поднимаются наверх соответствующего Dashboard-блока;
+- Search Map с одной и несколькими строками остаётся на Москве и показывает реальные points;
+- Detail map имеет полноценный размер;
+- Detail показывает «Что это / Что получу / Почему понравится»;
+- paid price визуально красный.
