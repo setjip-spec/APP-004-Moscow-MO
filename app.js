@@ -101,8 +101,28 @@ function safeHref(url){
   return "";
 }
 function tempFmt(v){
-  const x=Math.round(n(v));
-  return (x>0?"+":"")+x+"°";
+  const x=Number(v);
+  if(!Number.isFinite(x)) return "—";
+  const rounded=Math.round(x);
+  return (rounded>0?"+":"")+rounded+"°";
+}
+function moscowDateKey(value=new Date()){
+  const d=value instanceof Date?value:new Date(value);
+  if(Number.isNaN(d.getTime())) return "";
+  return new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/Moscow",year:"numeric",month:"2-digit",day:"2-digit"}).format(d);
+}
+function dateFromMoscowKey(key){
+  return key?new Date(key+"T00:00:00+03:00"):null;
+}
+function addMoscowDays(key,days){
+  const d=dateFromMoscowKey(key);
+  if(!d||Number.isNaN(d.getTime())) return key;
+  d.setUTCDate(d.getUTCDate()+Number(days||0));
+  return moscowDateKey(d);
+}
+function todayMoscowLabel(){
+  const d=dateFromMoscowKey(isoDateMoscow());
+  return new Intl.DateTimeFormat("ru-RU",{timeZone:"Europe/Moscow",weekday:"long",day:"numeric",month:"long",year:"numeric"}).format(d);
 }
 function fmtDate(v,opts={day:"numeric",month:"long"}){
   if(!v) return "Дата не указана";
@@ -338,7 +358,7 @@ async function loadAll(){
       return {...ex,...p,title:pl.name||ex.variant_name||ex.parent_activity||"Без названия",district_city:pl.district_city,nearest_transit:pl.nearest_transit,official_url:pl.official_url};
     });
     state.research=rs.data||[];
-    state.events=(es.data||[]).filter(x=>eventStillCurrent(x));
+    state.events=sortLiveEvents((es.data||[]).filter(x=>eventStillCurrent(x)));
     state.visits=vs.data||[];
     state.budget=bm.data||null;
     state.budgetVersion=(bv.data||[])[0]||null;
@@ -350,11 +370,52 @@ async function loadAll(){
     state.loading=false;
   }
 }
+function eventBounds(ev){
+  const today=isoDateMoscow();
+  const horizon=Math.max(1,Math.min(60,Number(state.settings?.event_horizon_days||14)));
+  const horizonEnd=addMoscowDays(today,horizon-1);
+  const startKey=ev.starts_at?moscowDateKey(ev.starts_at):"";
+  const endKey=ev.ends_at?moscowDateKey(ev.ends_at):"";
+  const freshKey=ev.fresh_until?moscowDateKey(ev.fresh_until):"";
+  const onDemand=String(ev.occurrence_status||"").toUpperCase()==="ON_DEMAND" || /ONDEMAND/i.test(String(ev.occurrence_code||""));
+  let liveEnd=endKey;
+  if(onDemand) liveEnd=freshKey||endKey;
+  if(!liveEnd && !onDemand) liveEnd=startKey;
+  return {today,horizon,horizonEnd,startKey,endKey,freshKey,onDemand,liveEnd};
+}
 function eventStillCurrent(ev){
-  if(!ev.ends_at) return true;
-  const end=new Date(ev.ends_at); if(Number.isNaN(end.getTime())) return true;
-  const today=new Date(isoDateMoscow()+"T00:00:00+03:00");
-  return end>=today;
+  const b=eventBounds(ev);
+  if(!b.liveEnd) return false;
+  if(b.liveEnd < b.today) return false;
+  if(b.startKey && b.startKey > b.horizonEnd) return false;
+  if(!b.startKey && b.onDemand && b.liveEnd > b.horizonEnd) return false;
+  return true;
+}
+function eventDisplayKey(ev){
+  const b=eventBounds(ev);
+  if(b.startKey && b.startKey < b.today && b.liveEnd>=b.today) return b.today;
+  return b.startKey||b.today;
+}
+function eventDateRangeLabel(ev){
+  const b=eventBounds(ev);
+  if(!b.startKey) return b.onDemand?"По записи":"Дата уточняется";
+  if(b.startKey < b.today && b.liveEnd>=b.today){
+    if(b.endKey && b.endKey>b.today) return "Идёт до "+fmtDate(b.endKey,{day:"numeric",month:"long"});
+    if(b.onDemand && b.freshKey>=b.today) return "Доступно по записи";
+    return "Идёт сегодня";
+  }
+  if(b.endKey && b.endKey>b.startKey){
+    return fmtDate(b.startKey,{day:"numeric",month:"short"})+" — "+fmtDate(b.endKey,{day:"numeric",month:"short"});
+  }
+  return "";
+}
+function sortLiveEvents(items){
+  return [...items].sort((a,b)=>{
+    const ka=eventDisplayKey(a),kb=eventDisplayKey(b);
+    if(ka!==kb) return ka.localeCompare(kb);
+    const sa=a.starts_at||"",sb=b.starts_at||"";
+    return sa.localeCompare(sb);
+  });
 }
 
 async function loadWeather(){
@@ -404,8 +465,12 @@ function weatherPeriod(hour,name){
   let idx=w.hourly.time.findIndex(t=>t===today+"T"+String(hour).padStart(2,"0")+":00");
   if(idx<0) idx=w.hourly.time.findIndex(t=>t.startsWith(today));
   if(idx<0) return null;
-  const code=w.hourly.weather_code[idx], info=wmo(code,hour<6||hour>=22);
-  return {name,temp:Math.round(n(w.hourly.temperature_2m[idx])),precip:Math.round(n(w.hourly.precipitation_probability[idx])),...info};
+  const temp=Number(w.hourly.temperature_2m?.[idx]);
+  const precip=Number(w.hourly.precipitation_probability?.[idx]);
+  const code=Number(w.hourly.weather_code?.[idx]);
+  if(!Number.isFinite(temp)||!Number.isFinite(code)) return null;
+  const info=wmo(code,hour<6||hour>=22);
+  return {name,temp,precip:Number.isFinite(precip)?Math.round(precip):null,...info};
 }
 
 function miniCard(item,type){
@@ -428,6 +493,7 @@ function eventCard(ev){
   return '<article class="event-card" data-detail="event:'+e(ev.id)+'">'+
     '<img class="event-thumb" src="'+e(safeImg(ev.cover_url))+'" alt="" loading="lazy" onerror="this.src=\''+FALLBACK_IMAGE+'\'">'+
     '<div><div class="event-title">'+e(ev.title)+'</div>'+
+      (eventDateRangeLabel(ev)?'<div class="meta-line event-live-label">'+icon("calendar")+e(eventDateRangeLabel(ev))+'</div>':'')+
       '<div class="meta-line">'+icon("clock")+e(ev.time_text||fmtDate(ev.starts_at,{hour:"2-digit",minute:"2-digit"}))+'</div>'+
       '<div class="meta-line">'+icon("pin")+e(districtFor(ev,"event"))+'</div>'+
       '<div class="event-tags"><span class="badge '+(ev.category?.includes("конц")?"red":"orange")+'">'+e(ev.category||"Событие")+'</span>'+
@@ -439,7 +505,7 @@ function eventCard(ev){
 function mobileEvents(events){
   if(!events.length) return '<div class="empty-state">Актуальных событий пока нет.</div>';
   return events.slice(0,8).map(ev=>{
-    const d=ev.starts_at?new Date(ev.starts_at):null;
+    const key=eventDisplayKey(ev),d=dateFromMoscowKey(key);
     const day=d?new Intl.DateTimeFormat("ru-RU",{timeZone:"Europe/Moscow",day:"2-digit"}).format(d):"•";
     const mon=d?new Intl.DateTimeFormat("ru-RU",{timeZone:"Europe/Moscow",month:"short"}).format(d):"по записи";
     const wd=d?new Intl.DateTimeFormat("ru-RU",{timeZone:"Europe/Moscow",weekday:"short"}).format(d):"";
@@ -448,6 +514,7 @@ function mobileEvents(events){
       '<div class="mobile-event-visual"><img src="'+e(safeImg(ev.cover_url))+'" alt="" loading="lazy" onerror="this.src=\''+FALLBACK_IMAGE+'\'">'+
         '<div class="mobile-date-badge"><b>'+e(day)+'</b><span>'+e(mon)+'</span><small>'+e(wd)+'</small></div><div class="mobile-heart">♡</div></div>'+
       '<div class="mobile-event-copy"><div class="event-title">'+e(ev.title)+'</div>'+
+        (eventDateRangeLabel(ev)?'<div class="meta-line event-live-label">'+icon("calendar")+e(eventDateRangeLabel(ev))+'</div>':'')+
         '<div class="meta-line">'+icon("clock")+e(ev.time_text||"Время уточняется")+'</div>'+
         '<div class="meta-line">'+icon("pin")+e(districtFor(ev,"event"))+'</div>'+
         '<div class="event-tags"><span class="badge red">'+e(ev.category||"Событие")+'</span><span class="badge blue">'+e(ev.supports_together===false?"Один":"Вместе")+'</span></div>'+
@@ -459,20 +526,21 @@ function mobileEvents(events){
 function groupEvents(events){
   const groups=new Map();
   for(const ev of events.slice(0,16)){
-    const key=ev.starts_at?fmtDate(ev.starts_at,{year:"numeric",month:"2-digit",day:"2-digit"}):"По записи";
+    const key=eventDisplayKey(ev)||"По записи";
     if(!groups.has(key)) groups.set(key,[]);
     groups.get(key).push(ev);
   }
   let html="";
   for(const [key,arr] of groups){
-    const d=arr[0].starts_at?new Date(arr[0].starts_at):null;
+    const d=key==="По записи"?null:dateFromMoscowKey(key);
     const day=d?new Intl.DateTimeFormat("ru-RU",{timeZone:"Europe/Moscow",day:"2-digit"}).format(d):"•";
     const month=d?new Intl.DateTimeFormat("ru-RU",{timeZone:"Europe/Moscow",month:"long"}).format(d):"по записи";
     const week=d?new Intl.DateTimeFormat("ru-RU",{timeZone:"Europe/Moscow",weekday:"short"}).format(d):"";
-    html+='<div class="event-group"><div class="date-tile"><div class="date-day">'+e(day)+'</div><div class="date-month">'+e(month)+'</div><div class="date-week">'+e(week)+'</div></div>'+
+    const todayMark=key===isoDateMoscow()?'<div class="date-today">сегодня</div>':"";
+    html+='<div class="event-group"><div class="date-tile"><div class="date-day">'+e(day)+'</div><div class="date-month">'+e(month)+'</div><div class="date-week">'+e(week)+'</div>'+todayMark+'</div>'+
       '<div class="event-cards">'+arr.map(eventCard).join("")+'</div></div>';
   }
-  return html||'<div class="empty-state">Актуальных событий в проекции пока нет.</div>';
+  return html||'<div class="empty-state">В выбранном окне актуальных событий нет.</div>';
 }
 
 function budgetMarkup(){
@@ -500,25 +568,33 @@ function weatherMarkup(){
   if(!state.weather) return '<div class="weather-body"><div class="empty-state">Погода временно недоступна.</div></div>';
   const ps=[weatherPeriod(8,"Утро"),weatherPeriod(14,"День"),weatherPeriod(20,"Вечер"),weatherPeriod(23,"Ночь")].filter(Boolean);
   const daily=state.weather.daily||{};
+  const count=Math.min(7,Array.isArray(daily.time)?daily.time.length:0);
   let week="";
-  for(let i=0;i<Math.min(7,daily.time?.length||0);i++){
-    const d=new Date(daily.time[i]+"T12:00:00+03:00"), info=wmo(daily.weather_code[i],false);
+  for(let i=0;i<count;i++){
+    const dateKey=daily.time[i],d=dateFromMoscowKey(dateKey), code=Number(daily.weather_code?.[i]);
+    const min=Number(daily.temperature_2m_min?.[i]),max=Number(daily.temperature_2m_max?.[i]),precip=Number(daily.precipitation_probability_max?.[i]);
+    if(!d||!Number.isFinite(code)||!Number.isFinite(min)||!Number.isFinite(max)) continue;
+    const info=wmo(code,false);
     const date=new Intl.DateTimeFormat("ru-RU",{timeZone:"Europe/Moscow",day:"2-digit",month:"2-digit"}).format(d);
     const wd=new Intl.DateTimeFormat("ru-RU",{timeZone:"Europe/Moscow",weekday:"short"}).format(d);
-    week+='<div class="week-row"><b>'+e(date)+' <span style="color:#2581dd">'+e(wd)+'</span></b><span>'+info.icon+'</span><span><span class="lo">+'+e(Math.round(n(daily.temperature_2m_min[i])))+'°</span> / <span class="hi">+'+e(Math.round(n(daily.temperature_2m_max[i])))+'°</span></span><span>'+e(info.text)+', '+e(Math.round(n(daily.precipitation_probability_max[i])))+'%</span></div>';
+    week+='<div class="week-row"><b>'+e(date)+' <span class="weather-weekday">'+e(wd)+'</span></b><span>'+info.icon+'</span><span><span class="lo">'+e(tempFmt(min))+'</span> / <span class="hi">'+e(tempFmt(max))+'</span></span><span>'+e(info.text)+(Number.isFinite(precip)?', '+e(Math.round(precip))+'%':'')+'</span></div>';
   }
+  const weekHtml=state.settings?.show_week_forecast===false?'':(
+    week?'<div class="week-title">Прогноз на 7 дней</div><div class="week-list">'+week+'</div>':'<div class="weather-warning">7-дневный прогноз временно недоступен.</div>'
+  );
   return '<div class="weather-body"><div class="weather-today-title">Сегодня, '+e(fmtDate(isoDateMoscow(),{day:"numeric",month:"long",weekday:"long"}))+'</div>'+
-    '<div class="period-grid">'+ps.map(p=>'<div class="period"><div class="period-name">'+e(p.name)+'</div><div class="weather-icon">'+p.icon+'</div><div class="temp">'+(p.temp>=0?"+":"")+e(p.temp)+'°</div><div class="condition">'+e(p.text)+'</div><div class="precip">Осадки '+e(p.precip)+'%</div></div>').join("")+'</div>'+
-    +(state.settings?.show_week_forecast===false?'':'<div class="week-title">Прогноз на 7 дней</div><div class="week-list">'+week+'</div>')+'</div>';
+    '<div class="period-grid">'+(ps.length?ps.map(p=>'<div class="period"><div class="period-name">'+e(p.name)+'</div><div class="weather-icon">'+p.icon+'</div><div class="temp">'+e(tempFmt(p.temp))+'</div><div class="condition">'+e(p.text)+'</div><div class="precip">'+(p.precip===null?'Осадки —':'Осадки '+e(p.precip)+'%')+'</div></div>').join(""):'<div class="weather-warning">Почасовой прогноз недоступен.</div>')+'</div>'+
+    weekHtml+'</div>';
 }
 function renderDashboard(){
+  const horizon=Math.max(1,Math.min(60,Number(state.settings?.event_horizon_days||14)));
   const favorites=state.favorites.slice(0,5), research=state.research.slice(0,6), events=filterItems(state.events,"event").slice(0,14);
-  const view='<div class="dashboard-grid">'+
+  const view='<div class="dashboard-date-strip"><span>'+icon("calendar")+'</span><b>Сегодня, '+e(todayMoscowLabel())+'</b><small>время Москвы</small></div><div class="dashboard-grid">'+
     '<div class="dash-left">'+
       '<section class="panel" id="favorites-panel"><div class="panel-head"><div class="panel-title-wrap"><span class="panel-icon">★</span><div><div class="panel-title">Куда сходить</div><div class="panel-sub">Проверенные места • Ваши фавориты</div></div></div><button class="link-btn" data-nav="#/search?source=favorite">Все любимые&nbsp; →</button></div><div class="stack-list">'+(favorites.length?favorites.map(x=>miniCard(x,"favorite")).join(""):'<div class="empty-state">Любимых пока нет.</div>')+'</div></section>'+
       '<section class="panel" id="research-panel"><div class="panel-head"><div class="panel-title-wrap"><span class="panel-icon blue">⌕</span><div><div class="panel-title">Исследовать новое</div><div class="panel-sub">Идеи, которые стоит проверить</div></div></div><button class="link-btn" data-nav="#/search?source=research">Все исследования&nbsp; →</button></div><div class="stack-list">'+(research.length?research.map(x=>miniCard(x,"research")).join(""):'<div class="empty-state">Нет активных исследований.</div>')+'</div></section>'+
     '</div>'+
-    '<section class="panel" id="events-panel"><div class="panel-head"><div class="panel-title-wrap"><span class="panel-icon blue">▣</span><div><div class="panel-title">События — ближайшие 14 дней</div><div class="panel-sub desktop-only">Актуальные события в Москве и МО</div></div></div><button class="link-btn" data-nav="#/search?source=event">Все события&nbsp; →</button></div><div class="event-list desktop-event-list">'+groupEvents(events)+'</div><div class="mobile-event-list mobile-only">'+mobileEvents(events)+'</div></section>'+
+    '<section class="panel" id="events-panel"><div class="panel-head"><div class="panel-title-wrap"><span class="panel-icon blue">▣</span><div><div class="panel-title">События — ближайшие '+e(horizon)+' дней</div><div class="panel-sub desktop-only">Актуальные события в Москве и МО</div></div></div><button class="link-btn" data-nav="#/search?source=event">Все события&nbsp; →</button></div><div class="event-list desktop-event-list">'+groupEvents(events)+'</div><div class="mobile-event-list mobile-only">'+mobileEvents(events)+'</div></section>'+
     '<div class="dash-right">'+
       '<section class="panel" id="budget-panel"><div class="panel-head"><div class="panel-title-wrap"><span class="panel-icon blue">'+icon("wallet")+'</span><div class="panel-title">Бюджет месяца</div></div><button class="link-btn" data-nav="#/settings">Настроить&nbsp; →</button></div>'+budgetMarkup()+'</section>'+
       '<section class="panel" id="weather-panel"><div class="panel-head"><div class="panel-title-wrap"><span class="panel-icon">🌤️</span><div><div class="panel-title">Погода в '+e(state.weather?._city||state.settings?.weather_city||"Москве")+'</div><div class="panel-sub">Источник: Open‑Meteo</div></div></div><button class="link-btn">Открыть на карте&nbsp; →</button></div>'+weatherMarkup()+'</section>'+
