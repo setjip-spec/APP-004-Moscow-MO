@@ -612,3 +612,16 @@ body.density-compact .mini-card{min-height:56px;padding:5px 0}body.density-compa
   .search-explorer{position:static;max-height:42vh;width:100%;order:0}
   .results-panel{order:1;width:100%}
 }
+
+
+/* Hard guarantee: Leaflet can never cover the Search filter overlay. */
+body.filter-overlay-open .leaflet-container,
+body.filter-overlay-open .search-map{
+  visibility:hidden!important;
+  pointer-events:none!important;
+}
+body.filter-overlay-open .filter-drawer,
+body.filter-overlay-open .filter-drawer-backdrop,
+body.filter-overlay-open .filter-drawer-tab{
+  visibility:visible!important;
+}
