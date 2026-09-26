@@ -32,6 +32,11 @@ const state = {
   searchText: "",
   resultSort: "relevance",
   resultView: "list",
+  filterDrawerOpen: false,
+  searchFolders: { favorite: true, research: true, event: true },
+  searchMapFocus: null,
+  musicianMapFocus: null,
+  metroVisible: true,
   filters: {
     district: "",
     environment: "",
@@ -62,6 +67,64 @@ const state = {
   showMoreFavorites: false,
   showMoreResearch: false
 };
+
+const mapRegistry = new Map();
+
+function registerAppMap(containerId,map){
+  const previous=mapRegistry.get(containerId);
+  if(previous?.map && previous.map!==map){
+    try{ previous.map.remove(); }catch{}
+  }
+  const record={map,markers:new Map(),metroLayer:null};
+  mapRegistry.set(containerId,record);
+  return record;
+}
+function setMetroVisible(visible){
+  state.metroVisible=Boolean(visible);
+  for(const record of mapRegistry.values()){
+    if(!record?.map||!record?.metroLayer) continue;
+    try{
+      if(state.metroVisible){
+        if(!record.map.hasLayer(record.metroLayer)) record.metroLayer.addTo(record.map);
+      }else if(record.map.hasLayer(record.metroLayer)){
+        record.map.removeLayer(record.metroLayer);
+      }
+    }catch{}
+  }
+  document.querySelectorAll("[data-map-metro-toggle]").forEach(input=>{ input.checked=state.metroVisible; });
+}
+function focusRegisteredMap(containerId,key,zoom=16){
+  const record=mapRegistry.get(containerId);
+  const marker=record?.markers?.get(key);
+  if(!record?.map||!marker) return false;
+  const latlng=marker.getLatLng?.();
+  if(!latlng) return false;
+  record.map.setView(latlng,Math.max(Number(zoom)||16,record.map.getZoom()),{animate:true});
+  if(marker.openPopup) marker.openPopup();
+  if(marker.setStyle){
+    try{
+      marker.setStyle({radius:12,weight:3});
+      setTimeout(()=>{ try{ marker.setStyle({radius:8,weight:2}); }catch{} },900);
+    }catch{}
+  }
+  return true;
+}
+function addMetroToggleControl(map){
+  if(!map||!window.L) return;
+  const Control=L.Control.extend({
+    options:{position:"topright"},
+    onAdd(){
+      const wrap=L.DomUtil.create("div","leaflet-control map-metro-control");
+      wrap.innerHTML='<label title="Показать или скрыть станции метро"><input type="checkbox" data-map-metro-toggle '+(state.metroVisible?"checked":"")+'><span class="metro-m">M</span><span>Метро</span></label>';
+      L.DomEvent.disableClickPropagation(wrap);
+      L.DomEvent.disableScrollPropagation(wrap);
+      const input=wrap.querySelector("input");
+      input?.addEventListener("change",()=>setMetroVisible(input.checked));
+      return wrap;
+    }
+  });
+  new Control().addTo(map);
+}
 
 const SVG = {
   home:'<path d="M3 11 12 3l9 8v9a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z"/>',
@@ -359,7 +422,7 @@ async function loadMetroStations(){
   })();
   return state.metroStationsPromise;
 }
-async function addMetroStationsLayer(map){
+async function addMetroStationsLayer(map,containerId){
   if(!map||!window.L) return;
   const stations=await loadMetroStations();
   if(!stations.length||!map.getContainer()) return;
@@ -370,7 +433,11 @@ async function addMetroStationsLayer(map){
     pane.style.pointerEvents="none";
   }
 
-  const layer=L.layerGroup().addTo(map);
+  const layer=L.layerGroup();
+  const record=mapRegistry.get(containerId);
+  if(record) record.metroLayer=layer;
+  if(state.metroVisible) layer.addTo(map);
+
   const render=()=>{
     layer.clearLayers();
     const bounds=map.getBounds().pad(0.10);
@@ -406,18 +473,21 @@ async function buildLeafletMap(containerId,entries,{maxGeocode=0}={}){
   if(!window.L){ box.innerHTML='<div class="empty-state">Карта не загрузилась. Проверьте соединение.</div>'; return; }
 
   const map=L.map(box,{zoomControl:true,preferCanvas:true}).setView([55.7558,37.6176],10);
+  const record=registerAppMap(containerId,map);
   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{
     maxZoom:19,
     attribution:'&copy; OpenStreetMap contributors'
   }).addTo(map);
-  addMetroStationsLayer(map);
+  addMetroToggleControl(map);
+  addMetroStationsLayer(map,containerId);
 
   const bounds=[],missing=[];
   const addPoint=(entry,coords)=>{
-    L.circleMarker(coords,{
+    const marker=L.circleMarker(coords,{
       radius:8,weight:2,color:"#ffffff",
       fillColor:isPinned(entry.item,entry.type)?"#e83f55":"#187eea",fillOpacity:1
     }).addTo(map).bindPopup(mapPopupHtml(entry.item,entry.type));
+    record.markers.set(entry.type+":"+entry.item.id,marker);
     bounds.push(coords);
   };
 
