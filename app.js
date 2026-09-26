@@ -394,7 +394,19 @@ function headerMarkup(active){
   '</header>';
 }
 
-function searchPanelMarkup(){
+function searchPanelMarkup(mode="search"){
+  if(mode==="dashboard"){
+    return '<section class="search-panel dashboard-quick-panel">'+
+      '<div class="search-top"><div class="search-wrap">'+icon("search")+
+        '<form id="global-search-form"><input class="global-search" id="global-search" autocomplete="off" value="" placeholder="Открыть поиск по местам, исследованиям и событиям..."></form>'+
+        '<div class="search-hint">Введите запрос — откроется отдельная страница «Поиск».</div>'+
+      '</div></div>'+
+      '<div class="quick-row"><span class="quick-label">Быстрые фильтры:</span>'+
+        dashboardQuickChip("today","Сегодня")+dashboardQuickChip("tomorrow","Завтра")+dashboardQuickChip("weekend","Выходные")+dashboardQuickChip("14d","14 дней")+
+        dashboardQuickChip("alone","👤 Один")+dashboardQuickChip("together","👥 Вместе")+dashboardQuickChip("day","☀️ День")+dashboardQuickChip("evening","🌙 Вечер")+
+        dashboardQuickChip("moscow","📍 Москва")+dashboardQuickChip("mo","⌂ МО")+dashboardQuickChip("free","♙ Бесплатно")+
+      '</div></section>';
+  }
   const s=state.sources;
   return '<section class="search-panel">'+
     '<div class="search-top"><div class="search-wrap">'+icon("search")+
@@ -404,11 +416,10 @@ function searchPanelMarkup(){
     '<div class="source-block"><div class="source-title">Искать в источниках:</div><div class="sources">'+
       sourceToggle("favorite",s.favorite)+sourceToggle("research",s.research)+sourceToggle("event",s.event)+
     '</div></div></div>'+
-    '<div class="quick-row"><span class="quick-label">Быстрые фильтры:</span>'+
+    '<div class="quick-row"><span class="quick-label">Быстрые фильтры поиска:</span>'+
       quickChip("today","Сегодня")+quickChip("tomorrow","Завтра")+quickChip("weekend","Выходные")+quickChip("14d","14 дней")+
       quickChip("alone","👤 Один")+quickChip("together","👥 Вместе")+quickChip("day","☀️ День")+quickChip("evening","🌙 Вечер")+
       quickChip("moscow","📍 Москва")+quickChip("mo","⌂ МО")+quickChip("free","♙ Бесплатно")+
-      '<button class="outline-btn" data-nav="#/search">'+icon("filter")+'Ещё фильтры</button>'+
     '</div></section>';
 }
 function sourceToggle(key,on){
@@ -417,9 +428,12 @@ function sourceToggle(key,on){
 function quickChip(key,label){
   return '<button class="chip-btn '+(state.quick===key?"active":"")+'" data-quick="'+key+'">'+label+'</button>';
 }
-
+function dashboardQuickChip(key,label){
+  return '<button class="chip-btn '+(state.dashboardQuick===key?"active":"")+'" data-dashboard-quick="'+key+'">'+label+'</button>';
+}
 function shell(view,active="home",includeSearch=true){
-  root.innerHTML=headerMarkup(active)+'<main class="shell">'+(includeSearch?searchPanelMarkup():"")+'<div class="view">'+view+'</div></main>';
+  const mode=active==="home"?"dashboard":"search";
+  root.innerHTML=headerMarkup(active)+'<main class="shell">'+(includeSearch?searchPanelMarkup(mode):"")+'<div class="view">'+view+'</div></main>';
 }
 
 function renderAuth(){
@@ -799,15 +813,15 @@ function weatherMarkup(){
 function renderDashboard(){
   persistSearchState();
   const horizon=Math.max(1,Math.min(60,Number(state.settings?.event_horizon_days||14)));
-  const favoriteAll=state.sources.favorite?filterItems(state.favorites,"favorite"):[];
-  const researchAll=state.sources.research?filterItems(state.research,"research"):[];
-  const eventAll=state.sources.event?filterItems(state.events,"event"):[];
+  const favoriteAll=sortPinned(dashboardFilterItems(state.favorites,"favorite"),"favorite");
+  const researchAll=sortPinned(dashboardFilterItems(state.research,"research"),"research");
+  const eventAll=sortPinned(dashboardFilterItems(state.events,"event"),"event");
   const events=eventAll.slice(0,14);
   const favorites=state.showMoreFavorites?favoriteAll:favoriteAll.slice(0,5);
   const research=state.showMoreResearch?researchAll:researchAll.slice(0,6);
-  const favoriteEmpty=state.sources.favorite?"Любимых по текущим фильтрам нет.":"Источник «Любимые» отключён.";
-  const researchEmpty=state.sources.research?"Исследований по текущим фильтрам нет.":"Источник Research отключён.";
-  const eventEmpty=state.sources.event?"В выбранном окне актуальных событий нет.":"Источник «События» отключён.";
+  const favoriteEmpty="Любимых по текущему быстрому фильтру нет.";
+  const researchEmpty="Исследований по текущему быстрому фильтру нет.";
+  const eventEmpty="В выбранном окне актуальных событий нет.";
 
   const view='<div class="dashboard-date-strip"><span>'+icon("calendar")+'</span><b>Сегодня, '+e(todayMoscowLabel())+'</b><small>время Москвы</small></div><div class="dashboard-grid">'+
     '<div class="dash-left">'+
@@ -820,6 +834,32 @@ function renderDashboard(){
       (state.settings?.show_weather===false?'':'<section class="panel" id="weather-panel"><div class="panel-head"><div class="panel-title-wrap"><span class="panel-icon">🌤️</span><div><div class="panel-title">Погода в '+e(state.weather?._city||state.settings?.weather_city||"Москве")+'</div><div class="panel-sub">Источник: Open‑Meteo</div></div></div></div>'+weatherMarkup()+'</section>')+
     '</div></div>';
   shell(view,"home",true);
+}
+
+function dashboardFilterItems(items,type){
+  const quick=state.dashboardQuick;
+  if(!quick) return items;
+  return items.filter(x=>{
+    if(quick==="free") return Number(priceFor(x,type))===0;
+    if(quick==="evening") return String(x.time_of_day||x.best_window||x.time_text||"").toLowerCase().includes("веч");
+    if(quick==="day"){
+      const t=String(x.time_of_day||x.best_window||x.time_text||"").toLowerCase();
+      return t.includes("день")||t.includes("дн");
+    }
+    if(quick==="alone") return x.supports_alone!==false;
+    if(quick==="together") return x.supports_together!==false;
+    if(quick==="moscow"){
+      const geo=String(x.geo_scope||x.district_city||districtFor(x,type)||"").toLowerCase();
+      return !geo.includes("московская область")&&!/(^|\s)мо($|\s|,)/.test(geo);
+    }
+    if(quick==="mo"){
+      const geo=String(x.geo_scope||x.district_city||districtFor(x,type)||"").toLowerCase();
+      return geo.includes("московская область")||/(^|\s)мо($|\s|,)/.test(geo);
+    }
+    if(type==="event"&&["today","tomorrow","weekend","14d"].includes(quick)) return eventDateMatch(x,quick);
+    if(["today","tomorrow","weekend","14d"].includes(quick)) return true;
+    return true;
+  });
 }
 
 function filterItems(items,type){
@@ -895,6 +935,7 @@ function allSearchItems(){
   if(state.sources.favorite) out.push(...filterItems(state.favorites,"favorite").map(x=>({type:"favorite",item:x})));
   if(state.sources.research) out.push(...filterItems(state.research,"research").map(x=>({type:"research",item:x})));
   if(state.sources.event) out.push(...filterItems(state.events,"event").map(x=>({type:"event",item:x})));
+  if(state.resultSort==="relevance") out.sort((a,b)=>Number(isPinned(b.item,b.type))-Number(isPinned(a.item,a.type)));
   if(state.resultSort==="price") out.sort((a,b)=>n(priceFor(a.item,a.type),1e12)-n(priceFor(b.item,b.type),1e12));
   if(state.resultSort==="rating") out.sort((a,b)=>n(b.item.rating)-n(a.item.rating));
   if(state.resultSort==="name") out.sort((a,b)=>itemTitle(a.item,a.type).localeCompare(itemTitle(b.item,b.type),"ru"));
@@ -1402,6 +1443,8 @@ root.addEventListener("click",async ev=>{
   }
   const st=ev.target.closest("[data-source-toggle]");
   if(st){ const k=st.dataset.sourceToggle; state.sources[k]=!state.sources[k]; persistSearchState(); renderCurrent(); return; }
+  const dq=ev.target.closest("[data-dashboard-quick]");
+  if(dq){ state.dashboardQuick=state.dashboardQuick===dq.dataset.dashboardQuick?"":dq.dataset.dashboardQuick; renderDashboard(); return; }
   const q=ev.target.closest("[data-quick]");
   if(q && q.tagName!=="INPUT"){ state.quick=state.quick===q.dataset.quick?"":q.dataset.quick; persistSearchState(); renderCurrent(); return; }
   const viewSwitch=ev.target.closest("[data-result-view]");
