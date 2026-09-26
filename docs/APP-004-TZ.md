@@ -1,7 +1,7 @@
 # APP-004 — Москва и МО — ТЗ
-## DRAFT v0.11 — backend parity complete
+## DRAFT v0.12 — frontend beta
 
-**Статус:** BACKEND PARITY COMPLETE / FRONTEND IMPLEMENTATION NEXT  
+**Статус:** FRONTEND BETA / INTEGRATION QA PASSED  
 **Дата:** 25.09.2026  
 **DATA MODE target:** Supabase MINI-APPS-CLOUD, реляционная модель  
 **Runtime target:** GitHub Pages
@@ -297,14 +297,30 @@ Security/performance hardening APP-004:
 
 Подробно: `docs/BACKEND-REPORT.md`.
 
+## Frontend beta — 26.09.2026
+
+Реализован GitHub Pages frontend по шести approved PNG:
+1. Desktop Dashboard;
+2. Search / Results;
+3. Desktop History;
+4. Universal Detail Card;
+5. Mobile Dashboard;
+6. Desktop Settings.
+
+Frontend подключён к реальным Supabase данным и RLS. Search / History / Settings работают по каноническим полям; отсутствующие канонические данные не подменяются догадками.
+
+Публичный runtime:
+https://setjip-spec.github.io/APP-004-Moscow-MO/
+
+Подробный отчёт: `docs/FRONTEND-REPORT.md`.
+
 ## Следующий технический шаг
 
-1. Runtime media: Drive остаётся master/recovery, production images зеркалируются в web-readable storage.
-2. Weather + Event runtime integrations без секретных ключей во frontend.
-3. Frontend shell и страницы **по шести approved PNG**, с максимально точным повторением композиции, геометрии, плотности и визуального языка.
-4. Подключение реальных Supabase-данных, поиска, фильтров, History, Detail и Settings.
-5. Frontend/backend parity + integration QA.
-6. QA-014 остаётся финальным real-life SOAK перед release.
+1. Добавить реальные content images в Drive `04_CONTENT_IMAGES` и зеркалировать их в `app004-media`.
+2. Провести authenticated visual acceptance pass по шести approved PNG.
+3. Исправить найденные pixel/layout differences.
+4. Провести browser E2E flow QA.
+5. QA-014 Research → Visit остаётся финальным real-life SOAK перед release.
 
 ## Canonical data import — 25.09.2026
 
