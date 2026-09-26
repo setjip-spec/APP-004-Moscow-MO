@@ -49,7 +49,9 @@ const state = {
   historyExpanded: null,
   lastError: "",
   exportUrl: "",
-  budgetStatus: ""
+  budgetStatus: "",
+  showMoreFavorites: false,
+  showMoreResearch: false
 };
 
 const SVG = {
@@ -260,6 +262,7 @@ function headerMarkup(active){
   return '<header class="topbar">'+brandMarkup()+
     '<nav class="top-nav">'+
       '<button class="nav-btn '+(active==="home"?"active":"")+'" data-nav="#/">'+icon("home")+'<span>Главная</span></button>'+
+      '<button class="nav-btn '+(active==="search"?"active":"")+'" data-nav="#/search">'+icon("search")+'<span>Поиск</span></button>'+
       '<button class="nav-btn '+(active==="history"?"active":"")+'" data-nav="#/history">'+icon("history")+'<span>История</span></button>'+
       '<button class="nav-btn '+(active==="settings"?"active":"")+'" data-nav="#/settings">'+icon("settings")+'<span>Настройки</span></button>'+
     '</nav>'+
@@ -590,11 +593,13 @@ function weatherMarkup(){
 }
 function renderDashboard(){
   const horizon=Math.max(1,Math.min(60,Number(state.settings?.event_horizon_days||14)));
-  const favorites=state.favorites.slice(0,5), research=state.research.slice(0,6), events=filterItems(state.events,"event").slice(0,14);
+  const favoriteAll=filterItems(state.favorites,"favorite"), researchAll=filterItems(state.research,"research"), events=filterItems(state.events,"event").slice(0,14);
+  const favorites=state.showMoreFavorites?favoriteAll:favoriteAll.slice(0,5);
+  const research=state.showMoreResearch?researchAll:researchAll.slice(0,6);
   const view='<div class="dashboard-date-strip"><span>'+icon("calendar")+'</span><b>Сегодня, '+e(todayMoscowLabel())+'</b><small>время Москвы</small></div><div class="dashboard-grid">'+
     '<div class="dash-left">'+
-      '<section class="panel" id="favorites-panel"><div class="panel-head"><div class="panel-title-wrap"><span class="panel-icon">★</span><div><div class="panel-title">Куда сходить</div><div class="panel-sub">Проверенные места • Ваши фавориты</div></div></div><button class="link-btn" data-nav="#/search?source=favorite">Все любимые&nbsp; →</button></div><div class="stack-list">'+(favorites.length?favorites.map(x=>miniCard(x,"favorite")).join(""):'<div class="empty-state">Любимых пока нет.</div>')+'</div></section>'+
-      '<section class="panel" id="research-panel"><div class="panel-head"><div class="panel-title-wrap"><span class="panel-icon blue">⌕</span><div><div class="panel-title">Исследовать новое</div><div class="panel-sub">Идеи, которые стоит проверить</div></div></div><button class="link-btn" data-nav="#/search?source=research">Все исследования&nbsp; →</button></div><div class="stack-list">'+(research.length?research.map(x=>miniCard(x,"research")).join(""):'<div class="empty-state">Нет активных исследований.</div>')+'</div></section>'+
+      '<section class="panel" id="favorites-panel"><div class="panel-head"><div class="panel-title-wrap"><span class="panel-icon">★</span><div><div class="panel-title">Куда сходить</div><div class="panel-sub">Проверенные места • Ваши фавориты</div></div></div><button class="link-btn" data-nav="#/search?source=favorite">В поиск&nbsp; →</button></div><div class="stack-list">'+(favorites.length?favorites.map(x=>miniCard(x,"favorite")).join(""):'<div class="empty-state">Любимых пока нет.</div>')+'</div><div class="show-more-row"><button class="show-more-btn" data-show-more="favorite">'+(state.showMoreFavorites?"Свернуть ↑":"Показать ещё ("+Math.max(0,favoriteAll.length-favorites.length)+") ↓")+'</button></div></section>'+
+      '<section class="panel" id="research-panel"><div class="panel-head"><div class="panel-title-wrap"><span class="panel-icon blue">⌕</span><div><div class="panel-title">Исследовать новое</div><div class="panel-sub">Идеи, которые стоит проверить</div></div></div><button class="link-btn" data-nav="#/search?source=research">В поиск&nbsp; →</button></div><div class="stack-list">'+(research.length?research.map(x=>miniCard(x,"research")).join(""):'<div class="empty-state">Нет активных исследований.</div>')+'</div><div class="show-more-row"><button class="show-more-btn" data-show-more="research">'+(state.showMoreResearch?"Свернуть ↑":"Показать ещё ("+Math.max(0,researchAll.length-research.length)+") ↓")+'</button></div></section>'+
     '</div>'+
     '<section class="panel" id="events-panel"><div class="panel-head"><div class="panel-title-wrap"><span class="panel-icon blue">▣</span><div><div class="panel-title">События — ближайшие '+e(horizon)+' дней</div><div class="panel-sub desktop-only">Актуальные события в Москве и МО</div></div></div><button class="link-btn" data-nav="#/search?source=event">Все события&nbsp; →</button></div><div class="event-list desktop-event-list">'+groupEvents(events)+'</div><div class="mobile-event-list mobile-only">'+mobileEvents(events)+'</div></section>'+
     '<div class="dash-right">'+
@@ -804,7 +809,7 @@ function renderSearch(){
     '</div><div class="sort-line"><span>Сортировка:</span><select class="select" id="result-sort"><option value="relevance">По релевантности</option><option value="price">По цене</option><option value="rating">По рейтингу</option><option value="name">По названию</option></select></div></div>'+
     '<div class="result-head"><span>#</span><span>Место / событие</span><span>Источник</span><span>Район / город</span><span>Цена с дорогой</span><span>Дорога</span><span>Всего</span><span>Рейтинг</span><span>Атмосфера</span><span></span></div>'+
     (rows||'<div class="empty-state">По текущим фильтрам ничего не найдено.</div>')+'</section></div>';
-  shell(view,"home",true);
+  shell(view,"search",true);
   const sort=document.querySelector("#result-sort"); if(sort) sort.value=state.resultSort;
 }
 function segmented(items,current){
@@ -1160,7 +1165,13 @@ root.addEventListener("click",async ev=>{
   const st=ev.target.closest("[data-source-toggle]");
   if(st){ const k=st.dataset.sourceToggle; state.sources[k]=!state.sources[k]; renderCurrent(); return; }
   const q=ev.target.closest("[data-quick]");
-  if(q && q.tagName!=="INPUT"){ state.quick=state.quick===q.dataset.quick?"":q.dataset.quick; if(route().path==="/") go("#/search"); else renderCurrent(); return; }
+  if(q && q.tagName!=="INPUT"){ state.quick=state.quick===q.dataset.quick?"":q.dataset.quick; renderCurrent(); return; }
+  const more=ev.target.closest("[data-show-more]");
+  if(more){
+    if(more.dataset.showMore==="favorite") state.showMoreFavorites=!state.showMoreFavorites;
+    if(more.dataset.showMore==="research") state.showMoreResearch=!state.showMoreResearch;
+    renderDashboard(); return;
+  }
   const adv=ev.target.closest("[data-adv-button]");
   if(adv){ const key=adv.dataset.advButton,value=adv.dataset.advValue||""; state.filters[key]=state.filters[key]===value?"":value; renderSearch(); return; }
   const atm=ev.target.closest("[data-atmos-filter]");
