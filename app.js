@@ -716,8 +716,13 @@ function mainStateFilter(){
 function emotionFilterVisual(){
   const defs=[["Радость","joy_score"],["Умиротворение","calm_score"],["Поток","flow_score"],["Удовольствие","pleasure_score"],["Облегчение","relief_score"],["Довольство","satisfaction_score"],["Смысл","meaning_score"],["Живость","vitality_score"]];
   return defs.map(([label,key])=>{
-    const cur=Number(state.filters.emotions[key]||0);
-    return '<label class="emotion-filter"><span>●</span><span>'+e(label)+'</span><div class="mini-slider"><i style="width:'+e(cur?cur/5*100:0)+'%"></i><b style="left:'+e(cur?cur/5*100:0)+'%"></b></div><select data-emotion-filter="'+e(key)+'"><option value="0">Любая</option><option value="2" '+(cur===2?"selected":"")+'>≥ 2</option><option value="3" '+(cur===3?"selected":"")+'>≥ 3</option><option value="4" '+(cur===4?"selected":"")+'>≥ 4</option></select></label>';
+    const raw=state.filters.emotions[key], active=raw!==undefined&&raw!==null&&Number(raw)>0;
+    const value=active?Number(raw):3;
+    return '<div class="emotion-slider-row '+(active?"active":"")+'">'+
+      '<div class="emotion-slider-head"><span>'+e(label)+'</span><b>'+(active?'≥ '+e(value):'Любая')+'</b><button type="button" data-emotion-any="'+e(key)+'" class="'+(!active?"active":"")+'">Любая</button></div>'+
+      '<input type="range" min="1" max="5" step="1" value="'+e(value)+'" data-emotion-range="'+e(key)+'" aria-label="'+e(label)+'">'+
+      '<div class="emotion-slider-marks"><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span></div>'+
+    '</div>';
   }).join("");
 }
 function atmosphereFilterVisual(){
@@ -1174,6 +1179,8 @@ root.addEventListener("click",async ev=>{
   }
   const adv=ev.target.closest("[data-adv-button]");
   if(adv){ const key=adv.dataset.advButton,value=adv.dataset.advValue||""; state.filters[key]=state.filters[key]===value?"":value; renderSearch(); return; }
+  const emotionAny=ev.target.closest("[data-emotion-any]");
+  if(emotionAny){ delete state.filters.emotions[emotionAny.dataset.emotionAny]; renderSearch(); return; }
   const atm=ev.target.closest("[data-atmos-filter]");
   if(atm){ const key=atm.dataset.atmosFilter; state.filters.atmosphere[key]=state.filters.atmosphere[key]?0:1; renderSearch(); return; }
   const clearRange=ev.target.closest("[data-clear-range]");
@@ -1200,9 +1207,16 @@ root.addEventListener("change",ev=>{
   if(ev.target.matches("[data-adv-select]")){ state.filters[ev.target.dataset.advSelect]=ev.target.value; renderSearch(); }
   if(ev.target.matches("[data-adv-check]")){ state.filters[ev.target.dataset.advCheck]=ev.target.checked; renderSearch(); }
   if(ev.target.matches("[data-adv-range]")){ const key=ev.target.dataset.advRange,max=Number(ev.target.max),value=Number(ev.target.value); state.filters[key]=value>=max?null:value; renderSearch(); }
-  if(ev.target.matches("[data-emotion-filter]")){ const key=ev.target.dataset.emotionFilter,value=Number(ev.target.value); if(value) state.filters.emotions[key]=value; else delete state.filters.emotions[key]; renderSearch(); }
   if(ev.target.matches("[data-history-select]")){ state.historyFilters[ev.target.dataset.historySelect]=ev.target.value; renderHistory(); }
 });
+root.addEventListener("input",ev=>{
+  if(ev.target.matches("[data-emotion-range]")){
+    const key=ev.target.dataset.emotionRange,value=Number(ev.target.value);
+    state.filters.emotions[key]=value;
+    renderSearch();
+  }
+});
+
 root.addEventListener("submit",async ev=>{
   ev.preventDefault();
   if(ev.target.id==="password-login"){ await signInPassword(ev.target); return; }
