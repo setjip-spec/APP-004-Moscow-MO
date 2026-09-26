@@ -1387,7 +1387,7 @@ function musicianRow(row){
   const performer=row.performer_name||row.title||"Исполнитель";
   const participants=row.participants||"Состав не указан";
   const music=row.music_style||"Стиль не указан";
-  return '<article class="musician-row">'+
+  return '<article class="musician-row" data-musician-map-focus="'+e(row.performance_code||"")+'">'+
     '<div class="musician-row-time">'+e(musicianTime(row))+'</div>'+
     '<div class="musician-row-main"><b>'+e(row.title||performer)+'</b>'+
       '<span>Кто участвует: '+e(participants)+'</span>'+
@@ -1412,16 +1412,19 @@ async function buildMusicianMap(){
   if(!box) return;
   if(!window.L){ box.innerHTML='<div class="empty-state">Карта не загрузилась.</div>'; return; }
   const map=L.map(box,{zoomControl:true,preferCanvas:true}).setView([55.7558,37.6176],10);
+  const record=registerAppMap("musicians-map",map);
   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19,attribution:'&copy; OpenStreetMap contributors'}).addTo(map);
-  addMetroStationsLayer(map);
+  addMetroToggleControl(map);
+  addMetroStationsLayer(map,"musicians-map");
   const rows=state.musicians.filter(r=>(r.source_kind==="STREET"?state.musicianVisible.street:state.musicianVisible.metro));
   const bounds=[];
   for(const row of rows){
     const coords=musicianCoords(row);
     if(!coords) continue;
     const color=row.source_kind==="STREET"?"#ef8c25":"#7257e9";
-    L.circleMarker(coords,{radius:9,weight:2,color:"#fff",fillColor:color,fillOpacity:1}).addTo(map)
+    const marker=L.circleMarker(coords,{radius:9,weight:2,color:"#fff",fillColor:color,fillOpacity:1}).addTo(map)
       .bindPopup('<div class="map-popup"><b>'+e(row.title||row.performer_name||"Музыкант")+'</b><div>'+e(musicianTime(row))+'</div><div>'+e(row.music_style||"")+'</div><div>'+e(row.address||row.venue_name||"")+'</div></div>');
+    if(row.performance_code) record.markers.set(String(row.performance_code),marker);
     bounds.push(coords);
   }
   requestAnimationFrame(()=>map.invalidateSize(true));
@@ -1429,6 +1432,11 @@ async function buildMusicianMap(){
   if(bounds.length===1) map.setView(bounds[0],14);
   else if(bounds.length>1) map.fitBounds(bounds,{padding:[38,38],maxZoom:14});
   else map.setView([55.7558,37.6176],10);
+  if(state.musicianMapFocus){
+    const key=state.musicianMapFocus;
+    state.musicianMapFocus=null;
+    if(!focusRegisteredMap("musicians-map",key,16)) toast("Для этого выступления пока нет подтверждённой точки на карте.",true);
+  }
   const status=document.querySelector('[data-map-status="musicians-map"]');
   if(status) status.textContent=rows.length
     ?("На карте "+bounds.length+" из "+rows.length+" подтверждённых выступлений сегодня.")
