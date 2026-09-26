@@ -1263,7 +1263,7 @@ function detailExplanationMarkup(item,type){
 function renderDetail(){
   const r=route(), type=r.params.get("type")||"research", id=r.params.get("id");
   const item=findItem(type,id);
-  if(!item){ shell('<section class="panel"><div class="empty-state">Карточка не найдена.</div></section>',"home",true); return; }
+  if(!item){ shell('<section class="panel"><div class="empty-state">Карточка не найдена.</div></section>',"detail",false); return; }
 
   const title=itemTitle(item,type), price=priceFor(item,type);
   const tags=[item.main_state,item.parent_activity||item.primary_activity||item.category,...(item.atmosphere_tags||[])].filter(Boolean).slice(0,11);
@@ -1301,7 +1301,7 @@ function renderDetail(){
           '<section class="panel repeat-card"><h3>↻ Повторить?</h3><strong>'+e(repeatText)+'</strong><p>'+e(lastVisit?.conclusion||"Решение появится после подтверждённого Visit.")+'</p></section></aside>'+
       '</div></div></div>';
 
-  shell(view,"home",true);
+  shell(view,"detail",false);
   if(itemPlace(item)) setTimeout(()=>buildLeafletMap("detail-map",[{type,item}],{maxGeocode:1}),0);
   else {
     const status=document.querySelector('[data-map-status="detail-map"]');
