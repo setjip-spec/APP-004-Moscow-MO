@@ -746,3 +746,12 @@ https://drive.google.com/file/d/14Z0ir3ptjyUi9vVGQqqx2Ra4_7JVTVKp/view?usp=drive
 - Основное описание Event берётся из подробного `source_description`; пользовательские объяснительные блоки остаются ниже отдельным слоем.
 - Detail Map остаётся встроенной и постоянно видимой при наличии географической привязки. Отдельная кнопка «Показать на карте» внутри этого же блока удалена.
 - «Музыканты» сохраняет два визуально отдельных слоя: STREET и METRO; оба используют данные `app004_music_performances` и общий metro reference layer.
+
+
+## Search navigation / map interaction — acceptance update 2026-09-26
+
+- Search filters are no longer a permanently occupied left column. A compact fixed side tab «Фильтры» opens a sliding drawer from the left; closing it returns the full width to the result workspace.
+- The former filter-column area is used by a folder-style result navigator with three canonical sections: «Куда сходить» (Favorite), «Исследование нового» (Research), «События» (Events).
+- Folder rows show the current filtered subset. Clicking a place/event row switches Search to map mode when needed, centers the map on the selected confirmed point, zooms in, and opens its map popup. If the point has no confirmed coordinates, the UI reports that instead of guessing coordinates.
+- All APP-004 Leaflet maps (Search, Musicians, Detail) expose a visible «M Метро» checkbox control. Metro visibility is a shared UI state; it can be turned on/off and remains consistent when another APP-004 map is opened in the same session.
+- Musicians list rows use the same click-to-focus behavior for confirmed performance coordinates.
