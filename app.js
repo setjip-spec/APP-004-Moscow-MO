@@ -1250,7 +1250,7 @@ function renderSettings(){
       '<section class="panel side-card about-card"><h3>ⓘ О приложении</h3><div class="about-app"><span class="brand-mark"><svg viewBox="0 0 42 42" fill="currentColor"><path d="M4 37h34v2H4zM8 35V18h4v17zm6 0V9h4v26zm6 0V15h4v20zm6 0V5h4v30zm6 0V21h4v14z"/></svg></span><div><b>Москва и МО</b><small>Планируйте прогулки, открывайте новые места и следите за событиями.</small></div><em>v0.4</em></div></section></aside></div>';
   shell(view,"settings",false);
 }
-async function exportUserData(){
+async async function exportUserData(){
   const btn=document.querySelector("#export-data");
   if(btn){btn.disabled=true;btn.dataset.oldText=btn.innerHTML;btn.innerHTML='Подготавливаю экспорт…';}
   try{
