@@ -1245,6 +1245,32 @@ function atmosphereLabels(item){
   for(const t of (Array.isArray(item.atmosphere_tags)?item.atmosphere_tags:[])) if(t&&!labels.includes(t)) labels.push(t);
   return labels.slice(0,4);
 }
+function adjustSearchMapForDrawer(){
+  const wrap=document.querySelector(".map-result-wrap");
+  const drawer=document.querySelector(".filter-drawer.open");
+  if(!wrap) return;
+
+  wrap.style.marginLeft="";
+  wrap.style.width="";
+
+  if(!state.filterDrawerOpen || !drawer || window.innerWidth<=820){
+    const map=mapRegistry.get("search-map")?.map;
+    if(map) setTimeout(()=>map.invalidateSize(true),30);
+    return;
+  }
+
+  const wrapRect=wrap.getBoundingClientRect();
+  const drawerRect=drawer.getBoundingClientRect();
+  const overlap=Math.max(0,Math.ceil(drawerRect.right-wrapRect.left+10));
+  if(overlap>0){
+    wrap.style.marginLeft=overlap+"px";
+    wrap.style.width="calc(100% - "+overlap+"px)";
+  }
+
+  const map=mapRegistry.get("search-map")?.map;
+  if(map) setTimeout(()=>map.invalidateSize(true),40);
+}
+
 function searchFolderLabel(type){
   return type==="favorite"?"Куда сходить":type==="research"?"Исследование нового":"События";
 }
@@ -1330,17 +1356,17 @@ function renderSearch(){
       advancedChips.map(x=>'<span class="active-chip">'+e(x)+' ×</span>').join("")+
     '</div><div class="sort-line"><span>Сортировка:</span><select class="select" id="result-sort"><option value="relevance">По релевантности</option><option value="price">По цене</option><option value="rating">По рейтингу</option><option value="name">По названию</option></select></div></div>'+
     (state.resultView==="map"
-      ?(state.filterDrawerOpen
-        ?'<div class="map-result-wrap map-suspended"><div class="map-suspended-note">Карта временно скрыта, пока открыты фильтры</div></div>'
-        :'<div class="map-result-wrap"><div id="search-map" class="search-map"></div><div class="map-status" data-map-status="search-map">Подготавливаю карту…</div></div>')
+      ?'<div class="map-result-wrap"><div id="search-map" class="search-map"></div><div class="map-status" data-map-status="search-map">Подготавливаю карту…</div></div>'
       :'<div class="result-head"><span>#</span><span>Место / событие</span><span>Источник</span><span>Район / город</span><span>Цена с дорогой</span><span>Дорога</span><span>Всего</span><span>Рейтинг</span><span>Атмосфера</span><span></span></div>'+(rows||'<div class="empty-state">По текущим фильтрам ничего не найдено.</div>'))+
     '</section></div>';
   shell(view,"search",true);
   document.body.classList.toggle("filter-overlay-open",state.filterDrawerOpen);
+  requestAnimationFrame(adjustSearchMapForDrawer);
   const sort=document.querySelector("#result-sort"); if(sort) sort.value=state.resultSort;
-  if(state.resultView==="map" && !state.filterDrawerOpen){
+  if(state.resultView==="map"){
     setTimeout(async()=>{
       await buildLeafletMap("search-map",results,{maxGeocode:20});
+      adjustSearchMapForDrawer();
       if(state.searchMapFocus){
         const key=state.searchMapFocus;
         state.searchMapFocus=null;
@@ -1945,6 +1971,7 @@ root.addEventListener("submit",async ev=>{
 });
 
 window.addEventListener("hashchange",()=>renderCurrent());
+window.addEventListener("resize",adjustSearchMapForDrawer);
 
 async function init(){
   const {data:{session}}=await supabase.auth.getSession();
