@@ -282,7 +282,58 @@ async function loadMetroStations(){
   if(state.metroStations.length) return state.metroStations;
   if(state.metroStationsPromise) return state.metroStationsPromise;
   state.metroStationsPromise=(async()=>{
-    const query='[out:json][timeout:20];nwr["railway"="station"]["station"="subway"](54.7,35.0,57.3,40.8);out center tags;';
+    const normalize=(rows)=>{
+      const seen=new Set(),stations=[];
+      for(const x of rows||[]){
+        const name=String(x?.name||x?.nameLocal||"").trim();
+        const lat=Number(x?.lat ?? x?.position?.lat);
+        const lng=Number(x?.lng ?? x?.lon ?? x?.position?.lng);
+        if(!name||!Number.isFinite(lat)||!Number.isFinite(lng)) continue;
+        if(lat<54.9||lat>56.1||lng<36.8||lng>38.1) continue;
+        const key=name.toLowerCase();
+        if(seen.has(key)) continue;
+        seen.add(key);
+        stations.push({name,lat,lng});
+      }
+      return stations;
+    };
+
+    // Primary source: bundled with APP-004 so the metro layer does not depend
+    // on a third-party API/CORS request at runtime.
+    try{
+      const res=await fetch("./data/metro-stations.json?v=20260926-2",{cache:"no-store"});
+      if(!res.ok) throw new Error("local metro "+res.status);
+      const json=await res.json();
+      const stations=normalize(json?.stations);
+      if(stations.length>=50){
+        state.metroStations=stations;
+        return stations;
+      }
+      throw new Error("local metro dataset too small: "+stations.length);
+    }catch(err){
+      console.warn("Bundled metro layer failed",err);
+    }
+
+    // Fallback: HeadHunter's Moscow metro directory.
+    try{
+      const res=await fetch("https://api.hh.ru/metro/1",{headers:{Accept:"application/json"}});
+      if(!res.ok) throw new Error("HH metro "+res.status);
+      const json=await res.json();
+      const rows=[];
+      for(const line of Array.isArray(json)?json:(json?.lines||[])){
+        for(const s of line?.stations||[]) rows.push({name:s.name,lat:s.lat,lng:s.lng});
+      }
+      const stations=normalize(rows);
+      if(stations.length>=50){
+        state.metroStations=stations;
+        return stations;
+      }
+    }catch(err){
+      console.warn("HH metro fallback failed",err);
+    }
+
+    // Last-resort OSM fallback.
+    const query='[out:json][timeout:25];(nwr["railway"="station"]["station"="subway"](54.9,36.8,56.1,38.1);nwr["railway"="station"]["subway"="yes"](54.9,36.8,56.1,38.1););out center tags;';
     const endpoints=[
       "https://overpass-api.de/api/interpreter",
       "https://overpass.kumi.systems/api/interpreter"
@@ -292,17 +343,16 @@ async function loadMetroStations(){
         const res=await fetch(endpoint+"?data="+encodeURIComponent(query),{headers:{Accept:"application/json"}});
         if(!res.ok) throw new Error("Overpass "+res.status);
         const json=await res.json();
-        const seen=new Set(), stations=[];
-        for(const x of json.elements||[]){
-          const lat=Number(x.lat ?? x.center?.lat), lng=Number(x.lon ?? x.center?.lon);
-          const name=x.tags?.["name:ru"]||x.tags?.name||"";
-          if(!name||!Number.isFinite(lat)||!Number.isFinite(lng)) continue;
-          const key=name.toLowerCase()+"|"+lat.toFixed(4)+"|"+lng.toFixed(4);
-          if(seen.has(key)) continue;
-          seen.add(key); stations.push({name,lat,lng});
+        const rows=(json.elements||[]).map(x=>({
+          name:x.tags?.["name:ru"]||x.tags?.name||"",
+          lat:x.lat ?? x.center?.lat,
+          lng:x.lon ?? x.center?.lon
+        }));
+        const stations=normalize(rows);
+        if(stations.length){
+          state.metroStations=stations;
+          return stations;
         }
-        state.metroStations=stations;
-        return stations;
       }catch(err){ console.warn("Metro layer source failed",endpoint,err); }
     }
     return [];
@@ -312,20 +362,32 @@ async function loadMetroStations(){
 async function addMetroStationsLayer(map){
   if(!map||!window.L) return;
   const stations=await loadMetroStations();
-  if(!stations.length) return;
+  if(!stations.length||!map.getContainer()) return;
+
+  if(!map.getPane("metroPane")){
+    const pane=map.createPane("metroPane");
+    pane.style.zIndex="650";
+    pane.style.pointerEvents="none";
+  }
+
   const layer=L.layerGroup().addTo(map);
   const render=()=>{
     layer.clearLayers();
-    const bounds=map.getBounds().pad(0.08);
+    const bounds=map.getBounds().pad(0.10);
     for(const s of stations){
       if(!bounds.contains([s.lat,s.lng])) continue;
       const html='<div class="metro-station-label"><span class="metro-m">M</span><span class="metro-name">'+e(s.name)+'</span></div>';
-      const marker=L.marker([s.lat,s.lng],{
+      L.marker([s.lat,s.lng],{
+        pane:"metroPane",
         interactive:false,
         keyboard:false,
-        icon:L.divIcon({className:"metro-station-icon",html,iconSize:null,iconAnchor:[10,10]})
-      });
-      marker.addTo(layer);
+        icon:L.divIcon({
+          className:"metro-station-icon",
+          html,
+          iconSize:[1,1],
+          iconAnchor:[0,0]
+        })
+      }).addTo(layer);
     }
   };
   render();
