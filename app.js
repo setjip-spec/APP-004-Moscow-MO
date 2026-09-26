@@ -240,47 +240,26 @@ function itemPlace(item){
 }
 function placeCoords(place){
   if(!place) return null;
+  const allowed=["VERIFIED","GEOCODED","MANUAL"];
+  if(place.geo_status && !allowed.includes(String(place.geo_status))) return null;
   if(place.latitude===null||place.latitude===undefined||place.latitude===""||place.longitude===null||place.longitude===undefined||place.longitude==="") return null;
   const lat=Number(place.latitude),lng=Number(place.longitude);
   if(!Number.isFinite(lat)||!Number.isFinite(lng)) return null;
-  if(lat<-90||lat>90||lng<-180||lng>180) return null;
-  if(Math.abs(lat)<0.0001&&Math.abs(lng)<0.0001) return null;
+  if(lat<54||lat>57.2||lng<35||lng>40.7) return null;
   return [lat,lng];
 }
 function geocodeQuery(place){
-  if(!place) return "";
-  const raw=String(place.address||place.name||"").trim();
-  if(!raw) return "";
-  const scope=String(place.geo_scope||"").toLowerCase().includes("мо")?"Московская область":"Москва";
-  return raw+", "+scope+", Россия";
+  return place?.geo_query||place?.address||place?.name||"";
 }
-function sleep(ms){ return new Promise(resolve=>setTimeout(resolve,ms)); }
 async function geocodePlace(place){
-  if(!place?.id) return null;
-  const existing=placeCoords(place); if(existing) return existing;
-  const query=geocodeQuery(place); if(!query) return null;
-  try{
-    const qs=new URLSearchParams({format:"jsonv2",limit:"3",addressdetails:"1",q:query});
-    const res=await fetch("https://nominatim.openstreetmap.org/search?"+qs,{headers:{Accept:"application/json"}});
-    if(!res.ok) return null;
-    const rows=await res.json();
-    const match=(Array.isArray(rows)?rows:[]).find(x=>/моск/i.test(String(x.display_name||"")));
-    if(!match) return null;
-    const lat=Number(match.lat),lng=Number(match.lon);
-    if(!Number.isFinite(lat)||!Number.isFinite(lng)) return null;
-    const {error}=await supabase.from("app004_places").update({latitude:lat,longitude:lng}).eq("id",place.id);
-    if(error) throw error;
-    place.latitude=lat;place.longitude=lng;
-    return [lat,lng];
-  }catch(err){
-    console.warn("Geocode failed",place?.name,err);
-    return null;
-  }
+  // Coordinates are rebuilt centrally and audited in Supabase.
+  // The browser must never guess/write map coordinates.
+  return placeCoords(place);
 }
 function mapPopupHtml(item,type){
   return '<div class="map-popup"><b>'+e(itemTitle(item,type))+'</b><div>'+e(districtFor(item,type))+'</div><a href="#/detail?type='+encodeURIComponent(type)+'&id='+encodeURIComponent(item.id)+'">Открыть карточку →</a></div>';
 }
-async function buildLeafletMap(containerId,entries,{maxGeocode=20}={}){
+async function buildLeafletMap(containerId,entries,{maxGeocode=0}={}){
   const box=document.getElementById(containerId);
   if(!box) return;
   if(!window.L){ box.innerHTML='<div class="empty-state">Карта не загрузилась. Проверьте соединение.</div>'; return; }
@@ -293,10 +272,10 @@ async function buildLeafletMap(containerId,entries,{maxGeocode=20}={}){
 
   const bounds=[],missing=[];
   const addPoint=(entry,coords)=>{
-    const marker=L.circleMarker(coords,{
-      radius:8,weight:2,color:"#ffffff",fillColor:isPinned(entry.item,entry.type)?"#e83f55":"#187eea",fillOpacity:1
+    L.circleMarker(coords,{
+      radius:8,weight:2,color:"#ffffff",
+      fillColor:isPinned(entry.item,entry.type)?"#e83f55":"#187eea",fillOpacity:1
     }).addTo(map).bindPopup(mapPopupHtml(entry.item,entry.type));
-    marker.on("click",()=>{});
     bounds.push(coords);
   };
 
@@ -306,29 +285,18 @@ async function buildLeafletMap(containerId,entries,{maxGeocode=20}={}){
     else if(pl?.id) missing.push(entry);
   }
 
-  const refit=()=>{
-    requestAnimationFrame(()=>map.invalidateSize(true));
-    setTimeout(()=>map.invalidateSize(true),120);
-    if(bounds.length===1) map.setView(bounds[0],13);
-    else if(bounds.length>1) map.fitBounds(bounds,{padding:[42,42],maxZoom:13});
-    else map.setView([55.7558,37.6176],10);
-  };
-  refit();
+  requestAnimationFrame(()=>map.invalidateSize(true));
+  setTimeout(()=>map.invalidateSize(true),120);
+  if(bounds.length===1) map.setView(bounds[0],13);
+  else if(bounds.length>1) map.fitBounds(bounds,{padding:[42,42],maxZoom:13});
+  else map.setView([55.7558,37.6176],10);
 
   const status=document.querySelector('[data-map-status="'+containerId+'"]');
   if(status){
     if(!entries.length) status.textContent="По текущим фильтрам точек нет. Показана Москва.";
-    else if(missing.length) status.textContent="Нанесено "+bounds.length+" • определяю координаты ещё для "+Math.min(maxGeocode,missing.length)+" точек…";
-    else status.textContent="На карте "+bounds.length+" точек.";
+    else if(!bounds.length) status.textContent="Для текущей выборки подтверждённых координат пока нет. Показана Москва.";
+    else status.textContent="На карте "+bounds.length+" точек"+(missing.length?" • ещё "+missing.length+" ожидают проверки координат":"")+".";
   }
-
-  for(const entry of missing.slice(0,maxGeocode)){
-    const coords=await geocodePlace(itemPlace(entry.item));
-    if(coords){ addPoint(entry,coords); refit(); }
-    if(status) status.textContent="На карте "+bounds.length+" точек"+(missing.length>maxGeocode?" • остальные координаты дозаполнятся при следующих открытиях":"");
-    await sleep(1050);
-  }
-  if(status && entries.length && !bounds.length) status.textContent="Для текущей выборки координаты пока не подтверждены. Карта оставлена на Москве.";
 }
 function parseNumberList(text){
   if(text===null||text===undefined) return [];
