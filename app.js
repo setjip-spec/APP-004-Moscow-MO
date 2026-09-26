@@ -1821,6 +1821,45 @@ root.addEventListener("click",async ev=>{
   }
   const focusMap=ev.target.closest("[data-focus-map]");
   if(focusMap){ document.querySelector("#detail-map")?.scrollIntoView({behavior:"smooth",block:"center"}); return; }
+
+  const filterToggle=ev.target.closest("[data-filter-drawer-toggle]");
+  if(filterToggle){
+    state.filterDrawerOpen=!state.filterDrawerOpen;
+    renderSearch(); return;
+  }
+  const filterClose=ev.target.closest("[data-filter-drawer-close]");
+  if(filterClose){
+    state.filterDrawerOpen=false;
+    renderSearch(); return;
+  }
+  const searchFolder=ev.target.closest("[data-search-folder]");
+  if(searchFolder){
+    const key=searchFolder.dataset.searchFolder;
+    if(Object.prototype.hasOwnProperty.call(state.searchFolders,key)) state.searchFolders[key]=!state.searchFolders[key];
+    renderSearch(); return;
+  }
+  const searchFocus=ev.target.closest("[data-search-map-focus]");
+  if(searchFocus){
+    const key=searchFocus.dataset.searchMapFocus;
+    if(state.resultView!=="map"){
+      state.resultView="map";
+      state.searchMapFocus=key;
+      persistSearchState();
+      renderSearch();
+    }else if(!focusRegisteredMap("search-map",key,16)){
+      toast("Для этого места пока нет подтверждённой точки на карте.",true);
+    }
+    return;
+  }
+  const musicianFocus=ev.target.closest("[data-musician-map-focus]");
+  if(musicianFocus && !ev.target.closest("a")){
+    const key=musicianFocus.dataset.musicianMapFocus;
+    if(!focusRegisteredMap("musicians-map",key,16)){
+      state.musicianMapFocus=key;
+      renderMusicians();
+    }
+    return;
+  }
   const musicFolder=ev.target.closest("[data-musician-folder]");
   if(musicFolder){
     const key=musicFolder.dataset.musicianFolder;
