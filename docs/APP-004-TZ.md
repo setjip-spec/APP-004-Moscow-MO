@@ -2,7 +2,7 @@
 ## DRAFT v0.13 — user acceptance corrections
 
 **Статус:** FRONTEND BETA / USER ACCEPTANCE FIXES SPECIFIED  
-**Дата:** 25.09.2026  
+**Дата:** 26.09.2026  
 **DATA MODE target:** Supabase MINI-APPS-CLOUD, реляционная модель  
 **Runtime target:** GitHub Pages
 
