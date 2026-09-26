@@ -153,6 +153,51 @@ function toast(msg,error=false){
   const el=document.createElement("div"); el.className="toast"+(error?" error":""); el.textContent=msg; document.body.append(el);
   setTimeout(()=>el.remove(),3600);
 }
+function applyInterfaceSettings(){
+  document.body.classList.toggle("density-compact",state.settings?.density==="COMPACT");
+}
+function persistSearchState(){
+  if(!state.session||!state.settings) return;
+  const key="app004-search-"+state.session.user.id;
+  const payload={};
+  if(state.settings.remember_last_query!==false) payload.searchText=state.searchText;
+  if(state.settings.remember_last_filters!==false){
+    payload.quick=state.quick;
+    payload.filters=state.filters;
+    payload.sources=state.sources;
+    payload.resultSort=state.resultSort;
+    payload.resultView=state.resultView;
+  }
+  try{
+    if(Object.keys(payload).length) localStorage.setItem(key,JSON.stringify(payload));
+    else localStorage.removeItem(key);
+  }catch{}
+}
+function restoreSearchState(){
+  const defaults={
+    favorite:state.settings?.default_favorites!==false,
+    research:state.settings?.default_research!==false,
+    event:state.settings?.default_events!==false
+  };
+  state.sources=defaults;
+  state.resultView=state.settings?.default_results_view==="MAP"?"map":"list";
+  if(!state.session) return;
+  try{
+    const raw=localStorage.getItem("app004-search-"+state.session.user.id);
+    if(!raw) return;
+    const saved=JSON.parse(raw);
+    if(state.settings?.remember_last_query!==false && typeof saved.searchText==="string") state.searchText=saved.searchText;
+    if(state.settings?.remember_last_filters!==false){
+      if(typeof saved.quick==="string") state.quick=saved.quick;
+      if(saved.filters&&typeof saved.filters==="object") state.filters={...state.filters,...saved.filters,emotions:{...(saved.filters.emotions||{})},atmosphere:{...(saved.filters.atmosphere||{})}};
+      if(saved.sources&&typeof saved.sources==="object") state.sources={...defaults,...saved.sources};
+      if(["relevance","price","rating","name"].includes(saved.resultSort)) state.resultSort=saved.resultSort;
+      if(["list","map"].includes(saved.resultView)) state.resultView=saved.resultView;
+    }
+  }catch{}
+  if(!state.quick && state.settings?.working_area==="MOSCOW") state.quick="moscow";
+}
+
 function route(){
   const raw=(location.hash||"#/").slice(1);
   const q=raw.indexOf("?");
@@ -413,6 +458,8 @@ async function loadAll(){
     ]);
     if(se) throw se;
     state.settings=settings||{};
+    applyInterfaceSettings();
+    restoreSearchState();
     const [fp,rs,es,vs,bm,bv,ef]=await Promise.all([
       supabase.from("app004_favorite_projection").select("*").eq("active_verified",true),
       supabase.from("app004_research").select("*").eq("active",true).order("research_code",{ascending:true}),
@@ -713,6 +760,7 @@ function weatherMarkup(){
     weekHtml+'</div>';
 }
 function renderDashboard(){
+  persistSearchState();
   const horizon=Math.max(1,Math.min(60,Number(state.settings?.event_horizon_days||14)));
   const favoriteAll=filterItems(state.favorites,"favorite"), researchAll=filterItems(state.research,"research"), events=filterItems(state.events,"event").slice(0,14);
   const favorites=state.showMoreFavorites?favoriteAll:favoriteAll.slice(0,5);
@@ -835,6 +883,7 @@ function mainStateFilter(){
     values.map(v=>'<button type="button" data-adv-button="mainState" data-adv-value="'+e(v)+'" class="'+(state.filters.mainState===v?"active":"")+'">'+e(v)+'</button>').join("")+'</div>';
 }
 function emotionFilterVisual(){
+  if(state.settings?.show_emotion_scales===false) return '<div class="panel-sub">Эмоциональные шкалы скрыты в настройках.</div>';
   const defs=[["Радость","joy_score"],["Умиротворение","calm_score"],["Поток","flow_score"],["Удовольствие","pleasure_score"],["Облегчение","relief_score"],["Довольство","satisfaction_score"],["Смысл","meaning_score"],["Живость","vitality_score"]];
   return defs.map(([label,key])=>{
     const raw=state.filters.emotions[key], active=raw!==undefined&&raw!==null&&Number(raw)>0;
@@ -847,6 +896,7 @@ function emotionFilterVisual(){
   }).join("");
 }
 function atmosphereFilterVisual(){
+  if(state.settings?.show_atmosphere_tags===false) return '<div class="panel-sub">Атмосферные теги скрыты в настройках.</div>';
   const defs=[["💧","Вода","water"],["♣","Зелень","greenery"],["▣","Огни","lights"],["♫","Музыка","music"],["♨","Фонтаны","fountains"],["◫","Простор","panorama"],["☾","Спокойствие","calm"],["⚒","Архитектура","architecture"]];
   return '<div class="atmo-grid">'+defs.map(([ic,label,key])=>{
     const unsupported=key==="architecture";
@@ -874,6 +924,7 @@ function activeAdvancedFilterChips(){
   return chips;
 }
 function atmosphereLabels(item){
+  if(state.settings?.show_atmosphere_tags===false) return [];
   const labels=[];
   for(const [key,cfg] of Object.entries(ATMOSPHERE_FILTERS)){
     if(cfg.field){
@@ -888,6 +939,7 @@ function atmosphereLabels(item){
   return labels.slice(0,4);
 }
 function renderSearch(){
+  persistSearchState();
   const r=route();
   const src=r.params.get("source");
   if(src && ["favorite","research","event"].includes(src)){
@@ -1139,6 +1191,7 @@ function detailVisitHistory(visits){
   return visits.slice(0,3).map(v=>'<div class="detail-visit-mini"><img src="'+e(safeImg(v.cover_url))+'" alt="" onerror="this.src=\''+FALLBACK_IMAGE+'\'"><div><b>'+e(v.visit_date?fmtDate(v.visit_date,{day:"numeric",month:"long",year:"numeric"}):"Дата не указана")+'</b><div class="meta-line">'+e(v.conclusion||v.what_worked||"")+'</div></div><span class="rating">★ '+e(v.rating||"—")+'</span></div>').join("");
 }
 function emotionMarkup(item){
+  if(state.settings?.show_emotion_scales===false) return '<div class="panel-sub">Эмоциональные шкалы скрыты в настройках.</div>';
   const fields=[["Спокойствие","calm_score"],["Вдохновение","relief_score"],["Радость","joy_score"],["Энергия","vitality_score"],["Уединение","satisfaction_score"]];
   return '<div class="emotion-bars">'+fields.map(([label,key])=>{const val=n(item[key]);return '<div class="emotion-bar-row"><span>'+e(label)+'</span><div class="bar"><i style="width:'+Math.max(0,Math.min(100,val/5*100))+'%"></i></div><b>'+e(item[key]??"—")+'</b></div>';}).join("")+'</div>';
 }
@@ -1189,7 +1242,7 @@ function renderSettings(){
         '<div class="weather-settings-grid"><label><b>Город</b><input class="input" name="weather_city" value="'+e(s.weather_city||"Москва")+'"></label>'+settingSwitch("Показывать погоду на Главной","", "show_weather")+settingSwitch("Показывать прогноз на 7 дней","", "show_week_forecast")+'<label class="setting-switch-row disabled"><span><b>Использовать моё текущее местоположение</b><small>В будущем, если будет поддержка.</small></span><span class="ui-switch"><input type="checkbox" disabled><i></i></span></label></div></section>'+
       '<section class="panel setting-card"><div class="setting-card-title"><span>▣</span><div><h3>Интерфейс</h3><p>Настройте удобный для вас вид приложения.</p></div></div>'+
         '<div class="interface-settings-grid"><div><b>Компактность выдачи</b><div class="button-segment"><label><input type="radio" name="density" value="COMPACT" '+(s.density==="COMPACT"?"checked":"")+'>Компактно</label><label><input type="radio" name="density" value="STANDARD" '+(s.density!=="COMPACT"?"checked":"")+'>Стандартно</label></div></div>'+
-        '<div><b>Формат результатов по умолчанию</b><div class="button-segment"><label><input type="radio" name="default_results_view" value="LIST" '+(s.default_results_view!=="GRID"?"checked":"")+'>Список</label><label><input type="radio" name="default_results_view" value="GRID" '+(s.default_results_view==="GRID"?"checked":"")+'>Таблица</label></div></div>'+
+        '<div><b>Формат результатов по умолчанию</b><div class="button-segment"><label><input type="radio" name="default_results_view" value="LIST" '+(s.default_results_view!=="MAP"?"checked":"")+'>Список</label><label><input type="radio" name="default_results_view" value="MAP" '+(s.default_results_view==="MAP"?"checked":"")+'>Карта</label></div></div>'+
         '<div class="interface-toggles">'+settingSwitch("Показывать изображения","", "show_images")+settingSwitch("Показывать эмоциональные шкалы","", "show_emotion_scales")+settingSwitch("Показывать атмосферные теги","", "show_atmosphere_tags")+'</div></div></section>'+
       '<div class="save-bar"><button class="chip-btn" type="button" data-cancel-settings>Отменить изменения</button><button class="save-btn" type="submit">'+icon("save")+' Сохранить настройки</button></div></form>'+
     '<aside class="settings-side"><section class="panel side-card account-card"><h3>♙ Аккаунт</h3><div class="account-email">'+e(state.session?.user?.email||"Пользователь")+'<small>Ваш аккаунт</small></div><div class="sync-box">● <b>Данные синхронизированы</b><small>Supabase / RLS</small></div><button class="logout-btn" id="logout">⇥ Выйти</button></section>'+
@@ -1274,7 +1327,7 @@ async function saveSettings(form){
   const {error}=await supabase.from("app004_settings").update(patch).eq("user_id",state.session.user.id);
   if(error){ toast("Не удалось сохранить настройки: "+error.message,true); return; }
   toast("Настройки сохранены.");
-  await loadAll(); renderSettings();
+  await loadAll(); applyInterfaceSettings(); persistSearchState(); renderSettings();
 }
 
 function renderCurrent(){
@@ -1302,9 +1355,9 @@ root.addEventListener("click",async ev=>{
     go("#/detail?type="+encodeURIComponent(type)+"&id="+encodeURIComponent(id)); return;
   }
   const st=ev.target.closest("[data-source-toggle]");
-  if(st){ const k=st.dataset.sourceToggle; state.sources[k]=!state.sources[k]; renderCurrent(); return; }
+  if(st){ const k=st.dataset.sourceToggle; state.sources[k]=!state.sources[k]; persistSearchState(); renderCurrent(); return; }
   const q=ev.target.closest("[data-quick]");
-  if(q && q.tagName!=="INPUT"){ state.quick=state.quick===q.dataset.quick?"":q.dataset.quick; renderCurrent(); return; }
+  if(q && q.tagName!=="INPUT"){ state.quick=state.quick===q.dataset.quick?"":q.dataset.quick; persistSearchState(); renderCurrent(); return; }
   const viewSwitch=ev.target.closest("[data-result-view]");
   if(viewSwitch){ state.resultView=viewSwitch.dataset.resultView==="map"?"map":"list"; renderSearch(); return; }
   const more=ev.target.closest("[data-show-more]");
