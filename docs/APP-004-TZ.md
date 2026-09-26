@@ -1,7 +1,7 @@
 # APP-004 — Москва и МО — ТЗ
-## DRAFT v0.13 — user acceptance corrections
+## DRAFT v0.14 — acceptance fixes implemented
 
-**Статус:** FRONTEND BETA / USER ACCEPTANCE FIXES SPECIFIED  
+**Статус:** FRONTEND BETA / ACCEPTANCE FIXES IMPLEMENTED / BROWSER QA NEXT  
 **Дата:** 26.09.2026  
 **DATA MODE target:** Supabase MINI-APPS-CLOUD, реляционная модель  
 **Runtime target:** GitHub Pages
@@ -510,3 +510,63 @@ Ingestion обязан:
 12. no-image layout без «Фото будет добавлено»;
 13. GPT Event ingestion bridge;
 14. browser E2E и визуальная сверка с approved references после этих изменений.
+
+
+# 29. Acceptance implementation pass — 26.09.2026
+
+По пользовательскому acceptance-списку реализован следующий runtime-контур.
+
+## Реализовано
+
+- На Dashboard явно показывается текущая дата по `Europe/Moscow`.
+- Events LIVE фильтруются относительно текущего дня и `event_horizon_days` из Settings.
+- Завершившиеся dated occurrences не попадают в live UI; продолжающиеся многодневные события остаются и получают понятный диапазон/«идёт до».
+- On-demand Event без актуального `fresh_until/ends_at` не держится в LIVE бесконечно.
+- Weather runtime защищён от `NaN`; today + seven-day rendering обрабатывают отсутствующие значения как unavailable, а не как фиктивный 0.
+- Settings: Support удалён.
+- Budget получил отдельную кнопку **«Сохранить бюджет»**, явный success/error status и transactional RPC path.
+- Export создаёт JSON и оставляет отдельную ссылку «Скачать подготовленный файл», если браузер блокирует автоматическое скачивание.
+- Верхняя навигация: **Главная / Поиск / История / Настройки**.
+- Quick filters на Dashboard применяются на Dashboard; «Ещё фильтры» ведёт в Search.
+- Favorite и Research получили inline **«Показать ещё / Свернуть»**.
+- Search emotional filters заменены на mouse/touch range sliders **1–5** + «Любая».
+- Search получил реальный режим **«На карте»**.
+- Universal Detail получил встроенную карту и рабочий CTA «Показать на карте».
+- Map runtime: Leaflet + OpenStreetMap; отсутствующие Place coordinates определяются лениво через geocoding, проверяются на Moscow/MO и сохраняются обратно в `app004_places.latitude/longitude`.
+- Добавлена `app004_event_favorites` с authenticated RLS.
+- Event hearts сохраняются; избранные актуальные события сортируются выше остальных.
+- No-image layout: при пустом `cover_url` карточки не показывают «Фото будет добавлено», а Detail скрывает gallery.
+- Settings runtime подключён к:
+  - default sources;
+  - remembered query/filters;
+  - event horizon;
+  - weather / 7-day toggle;
+  - interface density;
+  - show images;
+  - show emotion scales;
+  - show atmosphere tags;
+  - default Search view List/Map.
+- Создан отдельный hourly bridge **APP-004 Events Sync**: канонический TECH Excel Events LIVE → idempotent Supabase Series/Occurrences; Excel остаётся staging/master для event-discovery task.
+
+## QA после реализации
+
+- JS validation: используется обязательный GitHub Actions check на каждый commit.
+- Event live-window SQL check: 33 SHOW source rows → 19 строк в текущем 14-day live-window; завершившихся до текущего дня среди них = 0.
+- Budget save RPC path rollback-tested: PASS.
+- Export tables readable under authenticated owner: PASS.
+- Event Favorites insert/delete rollback-tested: PASS.
+- Foreign authenticated UUID sees 0 APP-004 Events/Favorites rows.
+- QA data rollback leaves production without synthetic test rows.
+
+## Что ещё нельзя считать закрытым без браузерного прохода
+
+1. Увидеть фактические 7 строк недельной погоды в авторизованном live UI.
+2. Проверить скачивание Export в конкретном браузере пользователя.
+3. Открыть Search → Map и проверить качество первых geocoded pins.
+4. Открыть ВДНХ/другой Detail → проверить embedded map и CTA.
+5. Проверить mouse drag всех emotion sliders.
+6. Проверить Event heart → F5 → сохранение и сортировку.
+7. Проверить Budget save → F5 → сохранённое значение.
+8. Проверить mobile после добавления четвёртой вкладки Search.
+9. После визуального прохода — pixel/layout corrections.
+10. Финальный QA-014 Research → Visit SOAK остаётся release gate.
