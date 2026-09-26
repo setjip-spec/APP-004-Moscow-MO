@@ -883,16 +883,19 @@ function renderSearch(){
         filterSection("Доступность билетов",'<label class="check"><input type="checkbox" data-adv-check="ticketsOnly" '+(state.filters.ticketsOnly?"checked":"")+'> Есть билеты</label><label class="check unsupported-check" title="В текущем каноне нет подтверждённых строк"><input type="checkbox" disabled> Можно купить на месте · нет данных</label>')+
       '</div></div>'+
     '</aside>'+
-    '<section class="panel results-panel"><div class="results-toolbar"><div class="results-title">Найдено <b>'+results.length+'</b> варианта</div><div class="toolbar-right"><div class="view-toggle"><button class="active">'+icon("list")+' <span>Списком</span></button><button>'+icon("pin")+' <span>На карте</span></button></div></div></div>'+
+    '<section class="panel results-panel"><div class="results-toolbar"><div class="results-title">Найдено <b>'+results.length+'</b> варианта</div><div class="toolbar-right"><div class="view-toggle"><button data-result-view="list" class="'+(state.resultView==="list"?"active":"")+'">'+icon("list")+' <span>Списком</span></button><button data-result-view="map" class="'+(state.resultView==="map"?"active":"")+'">'+icon("pin")+' <span>На карте</span></button></div></div></div>'+
     '<div class="results-subbar"><div class="active-filters">'+
       (state.searchText?'<span class="active-chip">'+e(state.searchText)+' ×</span>':'')+
       (state.quick?'<span class="active-chip">'+e(state.quick)+' ×</span>':'')+
       advancedChips.map(x=>'<span class="active-chip">'+e(x)+' ×</span>').join("")+
     '</div><div class="sort-line"><span>Сортировка:</span><select class="select" id="result-sort"><option value="relevance">По релевантности</option><option value="price">По цене</option><option value="rating">По рейтингу</option><option value="name">По названию</option></select></div></div>'+
-    '<div class="result-head"><span>#</span><span>Место / событие</span><span>Источник</span><span>Район / город</span><span>Цена с дорогой</span><span>Дорога</span><span>Всего</span><span>Рейтинг</span><span>Атмосфера</span><span></span></div>'+
-    (rows||'<div class="empty-state">По текущим фильтрам ничего не найдено.</div>')+'</section></div>';
+    (state.resultView==="map"
+      ?'<div class="map-result-wrap"><div id="search-map" class="search-map"></div><div class="map-status" data-map-status="search-map">Подготавливаю карту…</div></div>'
+      :'<div class="result-head"><span>#</span><span>Место / событие</span><span>Источник</span><span>Район / город</span><span>Цена с дорогой</span><span>Дорога</span><span>Всего</span><span>Рейтинг</span><span>Атмосфера</span><span></span></div>'+(rows||'<div class="empty-state">По текущим фильтрам ничего не найдено.</div>'))+
+    '</section></div>';
   shell(view,"search",true);
   const sort=document.querySelector("#result-sort"); if(sort) sort.value=state.resultSort;
+  if(state.resultView==="map") setTimeout(()=>buildLeafletMap("search-map",results,{maxGeocode:20}),0);
 }
 function segmented(items,current){
   return '<div class="segment">'+items.map(([key,label])=>'<button type="button" data-quick="'+e(key)+'" class="'+(current===key?"active":"")+'">'+e(label)+'</button>').join("")+'</div>';
@@ -1248,6 +1251,8 @@ root.addEventListener("click",async ev=>{
   if(st){ const k=st.dataset.sourceToggle; state.sources[k]=!state.sources[k]; renderCurrent(); return; }
   const q=ev.target.closest("[data-quick]");
   if(q && q.tagName!=="INPUT"){ state.quick=state.quick===q.dataset.quick?"":q.dataset.quick; renderCurrent(); return; }
+  const viewSwitch=ev.target.closest("[data-result-view]");
+  if(viewSwitch){ state.resultView=viewSwitch.dataset.resultView==="map"?"map":"list"; renderSearch(); return; }
   const more=ev.target.closest("[data-show-more]");
   if(more){
     if(more.dataset.showMore==="favorite") state.showMoreFavorites=!state.showMoreFavorites;
