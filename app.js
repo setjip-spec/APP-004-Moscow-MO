@@ -1244,6 +1244,37 @@ function atmosphereLabels(item){
   for(const t of (Array.isArray(item.atmosphere_tags)?item.atmosphere_tags:[])) if(t&&!labels.includes(t)) labels.push(t);
   return labels.slice(0,4);
 }
+function searchFolderLabel(type){
+  return type==="favorite"?"Куда сходить":type==="research"?"Исследование нового":"События";
+}
+function searchFolderIcon(type){
+  return type==="favorite"?"⌂":type==="research"?"●":"♜";
+}
+function searchExplorerPanel(results){
+  const types=["favorite","research","event"];
+  return '<aside class="panel search-explorer">'+
+    '<div class="search-explorer-title"><div><b>Список</b><small>Нажми на место — карта приблизится к точке</small></div></div>'+
+    types.map(type=>{
+      const open=state.searchFolders[type]!==false;
+      const rows=results.filter(x=>x.type===type);
+      return '<section class="search-folder '+(open?"open":"")+'">'+
+        '<div class="search-folder-head">'+
+          '<button type="button" data-search-folder="'+type+'" class="search-folder-toggle"><span class="folder-chevron">'+(open?"⌄":"›")+'</span><span class="search-folder-icon">'+searchFolderIcon(type)+'</span><span><b>'+e(searchFolderLabel(type))+'</b><small>'+rows.length+' в выборке</small></span></button>'+
+          '<label class="search-source-check" title="Показывать этот раздел в поиске"><input type="checkbox" data-filter-source="'+type+'" '+(state.sources[type]?"checked":"")+'> <span>Вкл.</span></label>'+
+        '</div>'+
+        (open?'<div class="search-folder-list">'+(rows.length?rows.map(({item},index)=>{
+          const key=type+":"+item.id;
+          const price=priceFor(item,type);
+          return '<button type="button" class="search-explorer-item" data-search-map-focus="'+e(key)+'">'+
+            '<span class="search-explorer-num">'+(index+1)+'</span>'+
+            '<span class="search-explorer-copy"><b>'+e(itemTitle(item,type))+'</b><small>'+e(districtFor(item,type))+'</small></span>'+
+            '<span class="search-explorer-price '+(Number(price)===0?"free":"paid")+'">'+e(money(price))+'</span>'+
+          '</button>';
+        }).join(""):'<div class="search-folder-empty">По текущим фильтрам здесь ничего нет.</div>')+'</div>':'')+
+      '</section>';
+    }).join("")+
+  '</aside>';
+}
 function renderSearch(){
   persistSearchState();
   const r=route();
@@ -1259,11 +1290,14 @@ function renderSearch(){
   const subtypes=uniqueSearchValues(item=>item.experience_subtype).slice(0,120);
   const advancedChips=activeAdvancedFilterChips();
 
-  const view='<div class="results-shell">'+
-    '<aside class="panel filter-panel search-filter-panel"><div class="panel-head filter-main-head"><div class="panel-title-wrap"><span class="panel-icon blue">'+icon("filter")+'</span><div class="panel-title">Фильтры</div></div><span class="badge gray">Вариант 2</span></div>'+
-      '<div class="filter-columns"><div class="filter-column">'+
+  const filterDrawer=
+    '<button type="button" class="filter-drawer-tab '+(state.filterDrawerOpen?"open":"")+'" data-filter-drawer-toggle>'+icon("filter")+'<span>Фильтры</span></button>'+
+    '<div class="filter-drawer-backdrop '+(state.filterDrawerOpen?"open":"")+'" data-filter-drawer-close></div>'+
+    '<aside class="panel filter-panel search-filter-panel filter-drawer '+(state.filterDrawerOpen?"open":"")+'" aria-hidden="'+(state.filterDrawerOpen?"false":"true")+'">'+
+      '<div class="panel-head filter-main-head"><div class="panel-title-wrap"><span class="panel-icon blue">'+icon("filter")+'</span><div><div class="panel-title">Фильтры</div><div class="panel-sub">Настрой выборку и закрой панель</div></div></div><button type="button" class="filter-drawer-close" data-filter-drawer-close aria-label="Закрыть">×</button></div>'+
+      '<div class="filter-drawer-scroll"><div class="filter-columns"><div class="filter-column">'+
         '<button class="link-btn reset-link" data-reset-filters>Сбросить всё&nbsp; ×</button>'+
-        filterSection("Источники",'<label class="check inline-check"><input type="checkbox" data-filter-source="favorite" '+(state.sources.favorite?"checked":"")+'> Любимые</label><label class="check inline-check"><input type="checkbox" data-filter-source="research" '+(state.sources.research?"checked":"")+'> Research</label><label class="check inline-check"><input type="checkbox" data-filter-source="event" '+(state.sources.event?"checked":"")+'> События</label>')+
+        filterSection("Источники",'<label class="check inline-check"><input type="checkbox" data-filter-source="favorite" '+(state.sources.favorite?"checked":"")+'> Куда сходить</label><label class="check inline-check"><input type="checkbox" data-filter-source="research" '+(state.sources.research?"checked":"")+'> Исследование нового</label><label class="check inline-check"><input type="checkbox" data-filter-source="event" '+(state.sources.event?"checked":"")+'> События</label>')+
         filterSection("Район / город",'<select class="select filter-select" data-adv-select="district">'+selectOptions(districts,state.filters.district,"Все районы")+'</select>')+
         '<div class="filter-pair">'+
           filterMini("Класс","experienceClass",classes,state.filters.experienceClass)+
@@ -1283,8 +1317,11 @@ function renderSearch(){
         filterSection("Бесплатно",'<label class="check"><input type="checkbox" data-quick="free" '+(state.quick==="free"?"checked":"")+'> Только бесплатные</label>')+
         filterSection("Скидка",'<label class="check"><input type="checkbox" data-adv-check="discountOnly" '+(state.filters.discountOnly?"checked":"")+'> Только со скидкой</label>')+
         filterSection("Доступность билетов",'<label class="check"><input type="checkbox" data-adv-check="ticketsOnly" '+(state.filters.ticketsOnly?"checked":"")+'> Есть билеты</label><label class="check unsupported-check" title="В текущем каноне нет подтверждённых строк"><input type="checkbox" disabled> Можно купить на месте · нет данных</label>')+
-      '</div></div>'+
-    '</aside>'+
+      '</div></div></div>'+
+    '</aside>';
+
+  const view=filterDrawer+'<div class="results-shell search-results-shell">'+
+    searchExplorerPanel(results)+
     '<section class="panel results-panel"><div class="results-toolbar"><div class="results-title">Найдено <b>'+results.length+'</b> варианта</div><div class="toolbar-right"><div class="view-toggle"><button data-result-view="list" class="'+(state.resultView==="list"?"active":"")+'">'+icon("list")+' <span>Списком</span></button><button data-result-view="map" class="'+(state.resultView==="map"?"active":"")+'">'+icon("pin")+' <span>На карте</span></button></div></div></div>'+
     '<div class="results-subbar"><div class="active-filters">'+
       (state.searchText?'<span class="active-chip">'+e(state.searchText)+' ×</span>':'')+
@@ -1297,7 +1334,16 @@ function renderSearch(){
     '</section></div>';
   shell(view,"search",true);
   const sort=document.querySelector("#result-sort"); if(sort) sort.value=state.resultSort;
-  if(state.resultView==="map") setTimeout(()=>buildLeafletMap("search-map",results,{maxGeocode:20}),0);
+  if(state.resultView==="map"){
+    setTimeout(async()=>{
+      await buildLeafletMap("search-map",results,{maxGeocode:20});
+      if(state.searchMapFocus){
+        const key=state.searchMapFocus;
+        state.searchMapFocus=null;
+        if(!focusRegisteredMap("search-map",key,16)) toast("Для этого места пока нет подтверждённой точки на карте.",true);
+      }
+    },0);
+  }
 }
 function segmented(items,current){
   return '<div class="segment">'+items.map(([key,label])=>'<button type="button" data-quick="'+e(key)+'" class="'+(current===key?"active":"")+'">'+e(label)+'</button>').join("")+'</div>';
