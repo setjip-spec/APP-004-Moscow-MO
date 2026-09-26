@@ -26,3 +26,4 @@ Visual/UI kit approved. Fresh canon verified. Schema, canonical import, transact
 
 - Frontend beta report: https://github.com/setjip-spec/APP-004-Moscow-MO/blob/main/docs/FRONTEND-REPORT.md
 - Live GitHub Pages: https://setjip-spec.github.io/APP-004-Moscow-MO/
+- Backup snapshot v0.4 — FRONTEND BETA: https://drive.google.com/drive/folders/1jb5_mcdQ0fnKlJPix8_n7ZVCijZNXoo5
