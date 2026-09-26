@@ -708,7 +708,7 @@ function miniCard(item,type){
       '<div class="meta-line">'+icon("clock")+'<span>'+e(duration)+'</span>'+
       (type==="research"?'<span class="meta-dot">дорога '+e(travelFor(item,type))+'</span>':'')+
       '</div></div>'+
-    '<div class="card-side"><span class="badge '+(Number(price)===0?"green":"orange")+'">'+e(money(price))+'</span><span class="heart">♡</span></div>'+
+    '<div class="card-side"><span class="badge price-badge '+(Number(price)===0?"green":"red")+'">'+e(money(price))+'</span><button class="entity-heart '+(isPinned(item,type)?"active":"")+'" data-pin-type="'+e(type)+'" data-pin-id="'+e(item.id)+'" title="Избранное">'+(isPinned(item,type)?"♥":"♡")+'</button></div>'+
   '</article>';
 }
 function eventCard(ev){
@@ -721,8 +721,8 @@ function eventCard(ev){
       '<div class="meta-line">'+icon("pin")+e(districtFor(ev,"event"))+'</div>'+
       '<div class="event-tags"><span class="badge '+(ev.category?.includes("конц")?"red":"orange")+'">'+e(ev.category||"Событие")+'</span>'+
       '<span class="badge blue">'+e(ev.supports_together===false?"Один":"Вместе")+'</span>'+
-      '<span class="badge '+(price===0?"green":"gray")+'">'+e(money(price))+'</span></div></div>'+
-    '<div class="event-actions"><button class="event-heart '+(isEventFavorite(ev)?"active":"")+'" data-event-favorite="'+e(ev.id)+'" title="Избранное">'+(isEventFavorite(ev)?"♥":"♡")+'</button><button class="details-btn" data-detail="event:'+e(ev.id)+'">Подробнее&nbsp; →</button></div>'+
+      '<span class="badge price-badge '+(price===0?"green":"red")+'">'+e(money(price))+'</span></div></div>'+
+    '<div class="event-actions"><button class="entity-heart '+(isPinned(ev,"event")?"active":"")+'" data-pin-type="event" data-pin-id="'+e(ev.id)+'" title="Избранное">'+(isPinned(ev,"event")?"♥":"♡")+'</button><button class="details-btn" data-detail="event:'+e(ev.id)+'">Подробнее&nbsp; →</button></div>'+
   '</article>';
 }
 function mobileEvents(events){
@@ -735,14 +735,14 @@ function mobileEvents(events){
     const price=ev.is_free?0:(ev.current_price??ev.regular_price);
     return '<article class="mobile-event-slide '+(image?"has-image":"no-image")+'" data-detail="event:'+e(ev.id)+'">'+
       (image?'<div class="mobile-event-visual"><img src="'+e(image)+'" alt="" loading="lazy" onerror="this.style.display=\'none\'">'+
-        '<div class="mobile-date-badge"><b>'+e(day)+'</b><span>'+e(mon)+'</span><small>'+e(wd)+'</small></div><button class="mobile-heart '+(isEventFavorite(ev)?"active":"")+'" data-event-favorite="'+e(ev.id)+'">'+(isEventFavorite(ev)?"♥":"♡")+'</button></div>':'')+
-      '<div class="mobile-event-copy">'+(!image?'<div class="mobile-noimage-head"><span class="mobile-date-inline"><b>'+e(day)+'</b> '+e(mon)+' · '+e(wd)+'</span><button class="mobile-heart inline '+(isEventFavorite(ev)?"active":"")+'" data-event-favorite="'+e(ev.id)+'">'+(isEventFavorite(ev)?"♥":"♡")+'</button></div>':'')+
+        '<div class="mobile-date-badge"><b>'+e(day)+'</b><span>'+e(mon)+'</span><small>'+e(wd)+'</small></div><button class="mobile-heart '+(isPinned(ev,"event")?"active":"")+'" data-pin-type="event" data-pin-id="'+e(ev.id)+'">'+(isPinned(ev,"event")?"♥":"♡")+'</button></div>':'')+
+      '<div class="mobile-event-copy">'+(!image?'<div class="mobile-noimage-head"><span class="mobile-date-inline"><b>'+e(day)+'</b> '+e(mon)+' · '+e(wd)+'</span><button class="mobile-heart inline '+(isPinned(ev,"event")?"active":"")+'" data-pin-type="event" data-pin-id="'+e(ev.id)+'">'+(isPinned(ev,"event")?"♥":"♡")+'</button></div>':'')+
         '<div class="event-title">'+e(ev.title)+'</div>'+
         (eventDateRangeLabel(ev)?'<div class="meta-line event-live-label">'+icon("calendar")+e(eventDateRangeLabel(ev))+'</div>':'')+
         '<div class="meta-line">'+icon("clock")+e(ev.time_text||"Время уточняется")+'</div>'+
         '<div class="meta-line">'+icon("pin")+e(districtFor(ev,"event"))+'</div>'+
         '<div class="event-tags"><span class="badge red">'+e(ev.category||"Событие")+'</span><span class="badge blue">'+e(ev.supports_together===false?"Один":"Вместе")+'</span></div>'+
-        '<div class="mobile-event-price">'+e(money(price))+(ev.availability_status?'<span class="badge green">'+e(ev.availability_status)+'</span>':'')+'</div>'+
+        '<div class="mobile-event-price '+(price===0?"free":"paid")+'">'+e(money(price))+(ev.availability_status?'<span class="badge green">'+e(ev.availability_status)+'</span>':'')+'</div>'+
         '<button class="details-btn" data-detail="event:'+e(ev.id)+'">Подробнее&nbsp; →</button></div>'+
     '</article>';
   }).join("");
@@ -1094,9 +1094,9 @@ function resultRow(item,type,index){
     (image?'<img class="result-thumb" src="'+e(image)+'" alt="" onerror="this.style.display=\'none\';this.closest(\'.result-item\')?.classList.add(\'image-failed\')">':'')+
     '<div><div class="result-title">'+e(itemTitle(item,type))+'</div><div class="meta-line">'+icon("pin")+e(item.parent_activity||item.primary_activity||item.category||"")+'</div><div class="meta-line">'+e(item.season||item.time_of_day||"Круглый год")+'</div></div></div>'+
     '<span><span class="source-cell source-'+type+'">'+(type==="favorite"?"⌂":type==="research"?"●":"♜")+' '+e(sourceLabel(type))+'</span></span>'+
-    '<span class="result-district">'+e(districtFor(item,type))+'</span><b class="result-price '+(Number(price)===0?"free":"")+'">'+e(money(price))+'</b>'+
+    '<span class="result-district">'+e(districtFor(item,type))+'</span><b class="result-price '+(Number(price)===0?"free":"paid")+'">'+e(money(price))+'</b>'+
     '<span>'+e(type==="research"?(item.travel_one_way_text||"—"):"—")+'</span><span>'+e(type==="research"?(item.total_duration_text||item.duration_on_site_text||"—"):durationFor(item,type))+'</span>'+
-    '<span class="rating">'+(rating!==null?"★ "+e(rating):"—")+'</span><span class="atmo-cell">'+(atmosphere.length?atmosphere.map(t=>'<i>'+e(t)+'</i>').join(""):'<i class="empty-atmo">—</i>')+'</span><span class="heart">'+(type==="event"?'<button class="result-heart '+(isEventFavorite(item)?"active":"")+'" data-event-favorite="'+e(item.id)+'">'+(isEventFavorite(item)?"♥":"♡")+'</button>':'♡')+'</span></article>';
+    '<span class="rating">'+(rating!==null?"★ "+e(rating):"—")+'</span><span class="atmo-cell">'+(atmosphere.length?atmosphere.map(t=>'<i>'+e(t)+'</i>').join(""):'<i class="empty-atmo">—</i>')+'</span><span class="heart"><button class="entity-heart result-heart '+(isPinned(item,type)?"active":"")+'" data-pin-type="'+e(type)+'" data-pin-id="'+e(item.id)+'">'+(isPinned(item,type)?"♥":"♡")+'</button></span></article>';
 }
 
 function historySearchPanel(){
@@ -1235,7 +1235,7 @@ function renderDetail(){
   const actions=(actionUrl
     ?'<a class="detail-primary-action" href="'+e(actionUrl)+'" target="_blank" rel="noopener noreferrer">▣ '+e(primaryLabel)+'</a>'
     :'<button class="detail-primary-action" disabled>▣ '+e(primaryLabel)+'</button>')+
-    '<button class="detail-soft-action">♥ В избранном</button><button class="detail-soft-action">⌯ Поделиться</button><button class="detail-icon-action">⋮</button>';
+    '<button class="detail-soft-action pin-detail '+(isPinned(item,type)?"active":"")+'" data-pin-type="'+e(type)+'" data-pin-id="'+e(item.id)+'">'+(isPinned(item,type)?"♥ В избранном":"♡ В избранное")+'</button><button class="detail-soft-action">⌯ Поделиться</button><button class="detail-icon-action">⋮</button>';
 
   const view='<div class="detail-page">'+
     '<div class="detail-main-area"><section class="panel detail-hero-card"><button class="back-results" data-nav="#/search">← Назад к результатам</button>'+
@@ -1426,14 +1426,16 @@ function renderCurrent(){
 }
 
 root.addEventListener("click",async ev=>{
+  const pin=ev.target.closest("[data-pin-type][data-pin-id]");
+  if(pin){
+    ev.preventDefault();ev.stopPropagation();
+    const type=pin.dataset.pinType,id=pin.dataset.pinId;
+    const item=findItem(type,id);
+    if(item) await togglePin(item,type);
+    return;
+  }
   const focusMap=ev.target.closest("[data-focus-map]");
   if(focusMap){ document.querySelector("#detail-map")?.scrollIntoView({behavior:"smooth",block:"center"}); return; }
-  const favEvent=ev.target.closest("[data-event-favorite]");
-  if(favEvent){
-    ev.preventDefault();ev.stopPropagation();
-    const event=state.events.find(x=>x.id===favEvent.dataset.eventFavorite);
-    await toggleEventFavorite(event); return;
-  }
   const nav=ev.target.closest("[data-nav]");
   if(nav){ ev.preventDefault(); go(nav.dataset.nav); return; }
   const detail=ev.target.closest("[data-detail]");
