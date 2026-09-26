@@ -238,6 +238,25 @@ function travelFor(item,type){
 function itemPlace(item){
   return item?._place||null;
 }
+function routeStartCoords(route){
+  if(!route) return null;
+  const allowed=["VERIFIED","GEOCODED","MANUAL"];
+  if(route.start_geo_status && !allowed.includes(String(route.start_geo_status))) return null;
+  if(route.start_latitude===null||route.start_latitude===undefined||route.start_longitude===null||route.start_longitude===undefined) return null;
+  const lat=Number(route.start_latitude),lng=Number(route.start_longitude);
+  if(!Number.isFinite(lat)||!Number.isFinite(lng)) return null;
+  if(lat<54||lat>57.2||lng<35||lng>40.7) return null;
+  return [lat,lng];
+}
+function itemMapCoords(item){
+  if(item?._route) return routeStartCoords(item._route);
+  return placeCoords(itemPlace(item));
+}
+function itemMapLabel(item,type){
+  if(item?._route) return "Старт маршрута: "+(item._route.start_address||item._route.start_transit||item._route.name||"точка старта");
+  const pl=itemPlace(item);
+  return pl?.address||districtFor(item,type);
+}
 function placeCoords(place){
   if(!place) return null;
   const allowed=["VERIFIED","GEOCODED","MANUAL"];
@@ -257,7 +276,7 @@ async function geocodePlace(place){
   return placeCoords(place);
 }
 function mapPopupHtml(item,type){
-  return '<div class="map-popup"><b>'+e(itemTitle(item,type))+'</b><div>'+e(districtFor(item,type))+'</div><a href="#/detail?type='+encodeURIComponent(type)+'&id='+encodeURIComponent(item.id)+'">Открыть карточку →</a></div>';
+  return '<div class="map-popup"><b>'+e(itemTitle(item,type))+'</b><div>'+e(itemMapLabel(item,type))+'</div><a href="#/detail?type='+encodeURIComponent(type)+'&id='+encodeURIComponent(item.id)+'">Открыть карточку →</a></div>';
 }
 async function buildLeafletMap(containerId,entries,{maxGeocode=0}={}){
   const box=document.getElementById(containerId);
@@ -280,9 +299,9 @@ async function buildLeafletMap(containerId,entries,{maxGeocode=0}={}){
   };
 
   for(const entry of entries){
-    const pl=itemPlace(entry.item),coords=placeCoords(pl);
+    const coords=itemMapCoords(entry.item);
     if(coords) addPoint(entry,coords);
-    else if(pl?.id) missing.push(entry);
+    else if(entry.item?._route?.id || itemPlace(entry.item)?.id) missing.push(entry);
   }
 
   requestAnimationFrame(()=>map.invalidateSize(true));
@@ -504,14 +523,23 @@ async function loadAll(){
       const pr=await supabase.from("app004_places").select("*").in("id",placeIds);
       if(pr.error) throw pr.error; places=pr.data||[];
     }
-    const expMap=new Map(exps.map(x=>[x.id,x])), placeMap=new Map(places.map(x=>[x.id,x]));
+    const routeIds=[...new Set([
+      ...exps.map(x=>x.route_id),
+      ...researchRows.map(x=>x.route_id)
+    ].filter(Boolean))];
+    let routes=[];
+    if(routeIds.length){
+      const rr=await supabase.from("app004_routes").select("*").in("id",routeIds);
+      if(rr.error) throw rr.error; routes=rr.data||[];
+    }
+    const expMap=new Map(exps.map(x=>[x.id,x])), placeMap=new Map(places.map(x=>[x.id,x])), routeMap=new Map(routes.map(x=>[x.id,x]));
     state.favorites=projections.map(p=>{
       const ex=expMap.get(p.experience_id)||{}, pl=placeMap.get(ex.place_id)||{};
-      return {...ex,...p,title:pl.name||ex.variant_name||ex.parent_activity||"Без названия",district_city:pl.district_city,nearest_transit:pl.nearest_transit,official_url:pl.official_url,_place:pl};
+      return {...ex,...p,title:pl.name||ex.variant_name||ex.parent_activity||"Без названия",district_city:pl.district_city,nearest_transit:pl.nearest_transit,official_url:pl.official_url,_place:pl,_route:routeMap.get(ex.route_id)||null};
     });
     const seriesCounts=new Map();
     for(const ev of eventRows) if(ev.series_id) seriesCounts.set(ev.series_id,(seriesCounts.get(ev.series_id)||0)+1);
-    state.research=researchRows.map(x=>({...x,_place:placeMap.get(x.place_id)||null}));
+    state.research=researchRows.map(x=>({...x,_place:placeMap.get(x.place_id)||null,_route:routeMap.get(x.route_id)||null}));
     state.events=sortLiveEvents(eventRows.filter(x=>eventStillCurrent(x)).map(x=>({...x,_place:placeMap.get(x.place_id)||null,_seriesCount:x.series_id?(seriesCounts.get(x.series_id)||1):0})));
     state.visits=vs.data||[];
     state.budget=bm.data||null;
@@ -1358,10 +1386,10 @@ function renderDetail(){
       '</div></div></div>';
 
   shell(view,"detail",false);
-  if(itemPlace(item)) setTimeout(()=>buildLeafletMap("detail-map",[{type,item}],{maxGeocode:1}),0);
+  if(item?._route || itemPlace(item)) setTimeout(()=>buildLeafletMap("detail-map",[{type,item}],{maxGeocode:0}),0);
   else {
     const status=document.querySelector('[data-map-status="detail-map"]');
-    if(status) status.textContent="Для этой карточки пока нет связанного Place с координатами.";
+    if(status) status.textContent="Для этой карточки пока нет подтверждённой географической привязки.";
   }
 }
 function summaryRow(ic,label,value){
