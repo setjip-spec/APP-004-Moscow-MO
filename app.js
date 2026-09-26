@@ -1319,7 +1319,7 @@ function renderSearch(){
 
   const filterDrawer=
     '<button type="button" class="filter-drawer-tab '+(state.filterDrawerOpen?"open":"")+'" data-filter-drawer-toggle>'+icon("filter")+'<span>Фильтры</span></button>'+
-    '<div class="filter-drawer-backdrop '+(state.filterDrawerOpen?"open":"")+'" data-filter-drawer-close></div>'+
+
     '<aside class="panel filter-panel search-filter-panel filter-drawer '+(state.filterDrawerOpen?"open":"")+'" aria-hidden="'+(state.filterDrawerOpen?"false":"true")+'">'+
       '<div class="panel-head filter-main-head"><div class="panel-title-wrap"><span class="panel-icon blue">'+icon("filter")+'</span><div><div class="panel-title">Фильтры</div><div class="panel-sub">Настрой выборку и закрой панель</div></div></div><button type="button" class="filter-drawer-close" data-filter-drawer-close aria-label="Закрыть">×</button></div>'+
       '<div class="filter-drawer-scroll"><div class="filter-columns"><div class="filter-column">'+
@@ -1360,7 +1360,7 @@ function renderSearch(){
       :'<div class="result-head"><span>#</span><span>Место / событие</span><span>Источник</span><span>Район / город</span><span>Цена с дорогой</span><span>Дорога</span><span>Всего</span><span>Рейтинг</span><span>Атмосфера</span><span></span></div>'+(rows||'<div class="empty-state">По текущим фильтрам ничего не найдено.</div>'))+
     '</section></div>';
   shell(view,"search",true);
-  document.body.classList.toggle("filter-overlay-open",state.filterDrawerOpen);
+  document.body.classList.remove("filter-overlay-open");
   requestAnimationFrame(adjustSearchMapForDrawer);
   const sort=document.querySelector("#result-sort"); if(sort) sort.value=state.resultSort;
   if(state.resultView==="map"){
@@ -1854,10 +1854,13 @@ root.addEventListener("click",async ev=>{
 
   const filterToggle=ev.target.closest("[data-filter-drawer-toggle]");
   if(filterToggle){
-    state.filterDrawerOpen=!state.filterDrawerOpen;
-    renderSearch(); return;
+    if(!state.filterDrawerOpen){
+      state.filterDrawerOpen=true;
+      renderSearch();
+    }
+    return;
   }
-  const filterClose=ev.target.closest("[data-filter-drawer-close]");
+  const filterClose=ev.target.closest(".filter-drawer-close");
   if(filterClose){
     state.filterDrawerOpen=false;
     renderSearch(); return;
