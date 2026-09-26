@@ -38,6 +38,14 @@ const state = {
     emotions: {},
     atmosphere: {}
   },
+  historyFilters: {
+    year: "",
+    companion: "",
+    timeOfDay: "",
+    mainState: "",
+    minRating: null,
+    repeat: ""
+  },
   historyExpanded: null,
   lastError: ""
 };
@@ -732,22 +740,67 @@ function historySearchPanel(){
     '<div class="history-years"><b>Быстрые фильтры:</b><div><button class="chip-btn active">Все</button><button class="chip-btn">2026</button><button class="chip-btn">2025</button><button class="chip-btn">2024</button><button class="chip-btn">2023</button></div></div></div>'+
     '<div class="history-search-bottom"><div class="history-active"><b>Активные фильтры:</b><span class="active-chip">Вместе ×</span><span class="active-chip">Вечер ×</span><span class="active-chip">Повторить: Да ×</span></div><div class="toolbar-right"><button class="outline-btn">⇅ Сортировка: Дата ↓</button><button class="outline-btn">▥ Колонки</button></div></div></section>';
 }
-function historyFilterMarkup(){
-  return '<aside class="panel filter-panel history-filter"><div class="panel-head"><div class="panel-title-wrap"><span class="panel-icon blue">'+icon("filter")+'</span><div class="panel-title">Фильтры истории</div></div><button class="link-btn">Сбросить всё</button></div>'+
-    filterSection("▣ Период",'<select class="select filter-select"><option>За всё время</option></select>')+
-    filterSection("♙ С кем был(и)",'<div class="segment"><button class="active">Любой</button><button>Один</button><button>Вместе</button></div>')+
-    filterSection("◷ Время посещения",'<div class="segment"><button class="active">Любое</button><button>День</button><button>Вечер</button></div>')+
-    filterSection("⌖ Район / город",'<select class="select filter-select"><option>Любой район / город</option></select>')+
-    filterSection("☺ Главное состояние",'<select class="select filter-select"><option>Любое состояние</option></select>')+
-    filterSection("★ Оценка",'<div class="rating-segment"><button class="active">Любая</button><button>5</button><button>4</button><button>3</button><button>2</button><button>1</button></div>')+
-    filterSection("↻ Повторить посещение",'<div class="segment"><button class="active">Любой</button><button>Да</button><button>Нет</button></div>')+
-    filterSection("₽ Стоимость Visit",'<div class="range-row"><input placeholder="от 0 ₽"><input placeholder="до 10 000 ₽"></div>')+
-    filterSection("♡ Эмоциональные состояния",'<select class="select filter-select"><option>Любое состояние</option></select>')+
-    '<div class="history-filter-action"><button class="action-primary">'+icon("search")+' Показать результаты</button><div class="panel-sub">Найдено '+e(state.visits.length)+' посещений</div></div></aside>';
+function resetHistoryFilters(){
+  state.historyFilters={year:"",companion:"",timeOfDay:"",mainState:"",minRating:null,repeat:""};
+}
+function historyCompanionMode(v){
+  const s=String(v.companions||"").trim().toLowerCase();
+  if(s==="один") return "alone";
+  if(!s || s==="не уточнено") return "";
+  return "together";
+}
+function historyRepeatMode(v){
+  const s=String(v.repeat_verdict||"").trim().toLowerCase();
+  if(!s || s==="уточнить") return "";
+  if(s.startsWith("нет") || s.includes("низкий") || s.includes("не повтор")) return "no";
+  if(s.startsWith("да") || s.includes("возможно") || s.includes("иногда") || s.includes("только")) return "yes";
+  return "";
+}
+function historyFilteredVisits(){
+  const q=state.searchText.trim().toLowerCase(), f=state.historyFilters;
+  return state.visits.filter(v=>{
+    if(q && ![v.place_route_name,v.main_state,v.conclusion,v.repeat_verdict,v.what_worked,v.what_failed,v.companions].filter(Boolean).join(" ").toLowerCase().includes(q)) return false;
+    if(f.year && String(v.visit_date||"").slice(0,4)!==f.year) return false;
+    if(f.companion && historyCompanionMode(v)!==f.companion) return false;
+    if(f.timeOfDay && String(v.time_of_day||"").toLowerCase()!==f.timeOfDay.toLowerCase()) return false;
+    if(f.mainState && String(v.main_state||"")!==f.mainState) return false;
+    if(f.minRating!==null && (v.rating===null||v.rating===undefined||Number(v.rating)<Number(f.minRating))) return false;
+    if(f.repeat && historyRepeatMode(v)!==f.repeat) return false;
+    return true;
+  });
+}
+function historySegment(key,items,current){
+  return '<div class="segment">'+items.map(([value,label])=>'<button type="button" data-history-button="'+e(key)+'" data-history-value="'+e(value)+'" class="'+(current===value?"active":"")+'">'+e(label)+'</button>').join("")+'</div>';
+}
+function historyActiveChips(){
+  const f=state.historyFilters,out=[];
+  if(f.year) out.push(f.year);
+  if(f.companion) out.push(f.companion==="alone"?"Один":"Вместе");
+  if(f.timeOfDay) out.push(f.timeOfDay);
+  if(f.mainState) out.push(f.mainState);
+  if(f.minRating!==null) out.push("Оценка ≥ "+f.minRating);
+  if(f.repeat) out.push("Повторить: "+(f.repeat==="yes"?"Да":"Нет"));
+  return out;
+}
+function historyFilterMarkup(filteredCount){
+  const f=state.historyFilters;
+  const states=[...new Set(state.visits.map(v=>v.main_state).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"ru"));
+  const years=[...new Set(state.visits.map(v=>String(v.visit_date||"").slice(0,4)).filter(y=>/^\d{4}$/.test(y)))].sort().reverse();
+  return '<aside class="panel filter-panel history-filter"><div class="panel-head"><div class="panel-title-wrap"><span class="panel-icon blue">'+icon("filter")+'</span><div class="panel-title">Фильтры истории</div></div><button class="link-btn" data-reset-history>Сбросить всё</button></div>'+
+    filterSection("▣ Период",'<select class="select filter-select" data-history-select="year"><option value="">За всё время</option>'+years.map(y=>'<option value="'+e(y)+'" '+(f.year===y?"selected":"")+'>'+e(y)+'</option>').join("")+'</select>')+
+    filterSection("♙ С кем был(и)",historySegment("companion",[["","Любой"],["alone","Один"],["together","Вместе"]],f.companion))+
+    filterSection("◷ Время посещения",historySegment("timeOfDay",[["","Любое"],["День","День"],["Вечер","Вечер"]],f.timeOfDay))+
+    filterSection("⌖ Район / город",'<div class="panel-sub">Для legacy Visits отдельный район не заполнен; используйте поиск по названию/маршруту.</div>')+
+    filterSection("☺ Главное состояние",'<select class="select filter-select" data-history-select="mainState"><option value="">Любое состояние</option>'+states.map(v=>'<option value="'+e(v)+'" '+(f.mainState===v?"selected":"")+'>'+e(v)+'</option>').join("")+'</select>')+
+    filterSection("★ Оценка",'<div class="rating-segment">'+[["","Любая"],["5","5"],["4","4+"],["3","3+"],["2","2+"],["1","1+"]].map(([v,l])=>'<button type="button" data-history-rating="'+e(v)+'" class="'+((f.minRating===null&&v==="")||String(f.minRating)===v?"active":"")+'">'+e(l)+'</button>').join("")+'</div>')+
+    filterSection("↻ Повторить посещение",historySegment("repeat",[["","Любой"],["yes","Да"],["no","Нет"]],f.repeat))+
+    filterSection("₽ Стоимость Visit",'<div class="history-disabled-filter" title="В импортированных legacy Visits visit_total пока не заполнен">Нет фактических сумм в текущем legacy-каноне</div>')+
+    filterSection("♡ Эмоциональные состояния",'<div class="panel-sub">Используйте «Главное состояние»; числовые эмоции доступны в подробной карточке Visit.</div>')+
+    '<div class="history-filter-action"><button class="action-primary" type="button">'+icon("search")+' Показать результаты</button><div class="panel-sub">Найдено '+e(filteredCount)+' посещений</div></div></aside>';
 }
 function renderHistory(){
-  const q=state.searchText.trim().toLowerCase();
-  const visits=state.visits.filter(v=>!q||[v.place_route_name,v.main_state,v.conclusion,v.repeat_verdict,v.what_worked,v.what_failed].filter(Boolean).join(" ").toLowerCase().includes(q));
+  const visits=historyFilteredVisits();
+  const active=historyActiveChips();
   const groups=new Map();
   for(const v of visits){
     const key=v.visit_date?new Intl.DateTimeFormat("ru-RU",{timeZone:"Europe/Moscow",month:"long",year:"numeric"}).format(new Date(v.visit_date+"T12:00:00+03:00")):"Дата не указана";
@@ -755,11 +808,16 @@ function renderHistory(){
   }
   let body="";
   for(const [month,arr] of groups){
-    const spent=arr.reduce((s,v)=>s+n(v.visit_total),0);
-    body+='<section class="month-group"><div class="month-title"><span>'+e(month)+'</span><small>'+arr.length+' посещения'+(spent?(' • Потрачено '+money(spent)):'')+'</small><span>⌃</span></div>'+arr.map(visitRow).join("")+'</section>';
+    const knownCosts=arr.map(v=>v.visit_total).filter(v=>v!==null&&v!==undefined&&v!=="");
+    const spent=knownCosts.reduce((s,v)=>s+Number(v),0);
+    body+='<section class="month-group"><div class="month-title"><span>'+e(month)+'</span><small>'+arr.length+' посещения'+(knownCosts.length?(' • Потрачено '+money(spent)):'')+'</small><span>⌃</span></div>'+arr.map(visitRow).join("")+'</section>';
   }
-  const view='<div>'+historySearchPanel()+'<div class="history-shell">'+historyFilterMarkup()+
-    '<section class="panel history-main">'+(body||'<div class="empty-state">Посещений не найдено.</div>')+'</section></div></div>';
+  const top=historySearchPanel().replace(
+    '<div class="history-active"><b>Активные фильтры:</b><span class="active-chip">Вместе ×</span><span class="active-chip">Вечер ×</span><span class="active-chip">Повторить: Да ×</span></div>',
+    '<div class="history-active"><b>Активные фильтры:</b>'+(active.length?active.map(x=>'<span class="active-chip">'+e(x)+'</span>').join(""):'<span class="panel-sub">нет</span>')+'</div>'
+  );
+  const view='<div>'+top+'<div class="history-shell">'+historyFilterMarkup(visits.length)+
+    '<section class="panel history-main">'+(body||'<div class="empty-state">По текущим фильтрам посещений не найдено.</div>')+'</section></div></div>';
   shell(view,"history",false);
 }
 function visitRow(v){
@@ -986,6 +1044,11 @@ root.addEventListener("click",async ev=>{
   if(atm){ const key=atm.dataset.atmosFilter; state.filters.atmosphere[key]=state.filters.atmosphere[key]?0:1; renderSearch(); return; }
   const clearRange=ev.target.closest("[data-clear-range]");
   if(clearRange){ state.filters[clearRange.dataset.clearRange]=null; renderSearch(); return; }
+  const hist=ev.target.closest("[data-history-button]");
+  if(hist){ const key=hist.dataset.historyButton,value=hist.dataset.historyValue||""; state.historyFilters[key]=value; renderHistory(); return; }
+  const histRating=ev.target.closest("[data-history-rating]");
+  if(histRating){ state.historyFilters.minRating=histRating.dataset.historyRating===""?null:Number(histRating.dataset.historyRating); renderHistory(); return; }
+  if(ev.target.closest("[data-reset-history]")){ state.searchText=""; resetHistoryFilters(); renderHistory(); return; }
   const exp=ev.target.closest("[data-expand-visit]");
   if(exp){ state.historyExpanded=state.historyExpanded===exp.dataset.expandVisit?null:exp.dataset.expandVisit; renderHistory(); return; }
   if(ev.target.closest("[data-reset-filters]")){ state.quick="";state.searchText="";state.sources={favorite:true,research:true,event:true};resetAdvancedFilters();renderSearch();return; }
@@ -1003,6 +1066,7 @@ root.addEventListener("change",ev=>{
   if(ev.target.matches("[data-adv-check]")){ state.filters[ev.target.dataset.advCheck]=ev.target.checked; renderSearch(); }
   if(ev.target.matches("[data-adv-range]")){ const key=ev.target.dataset.advRange,max=Number(ev.target.max),value=Number(ev.target.value); state.filters[key]=value>=max?null:value; renderSearch(); }
   if(ev.target.matches("[data-emotion-filter]")){ const key=ev.target.dataset.emotionFilter,value=Number(ev.target.value); if(value) state.filters.emotions[key]=value; else delete state.filters.emotions[key]; renderSearch(); }
+  if(ev.target.matches("[data-history-select]")){ state.historyFilters[ev.target.dataset.historySelect]=ev.target.value; renderHistory(); }
 });
 root.addEventListener("submit",async ev=>{
   ev.preventDefault();
