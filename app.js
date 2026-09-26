@@ -360,14 +360,30 @@ function eventStillCurrent(ev){
 async function loadWeather(){
   if(state.settings && state.settings.show_weather===false){ state.weather=null; return; }
   try{
+    const city=String(state.settings?.weather_city||"Москва").trim()||"Москва";
+    let latitude=55.7558, longitude=37.6176, resolvedName="Москва";
+    if(city.toLowerCase()!=="москва"){
+      const geoQs=new URLSearchParams({name:city,count:"1",language:"ru",format:"json"});
+      const geoRes=await fetch("https://geocoding-api.open-meteo.com/v1/search?"+geoQs);
+      if(geoRes.ok){
+        const geo=await geoRes.json();
+        const first=geo?.results?.[0];
+        if(first && Number.isFinite(Number(first.latitude)) && Number.isFinite(Number(first.longitude))){
+          latitude=Number(first.latitude);longitude=Number(first.longitude);resolvedName=first.name||city;
+        }else{
+          resolvedName=city;
+        }
+      }
+    }
     const qs=new URLSearchParams({
-      latitude:"55.7558",longitude:"37.6176",timezone:"Europe/Moscow",forecast_days:"7",
+      latitude:String(latitude),longitude:String(longitude),timezone:"Europe/Moscow",forecast_days:"7",
       hourly:"temperature_2m,weather_code,precipitation_probability",
       daily:"weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max"
     });
     const res=await fetch("https://api.open-meteo.com/v1/forecast?"+qs);
     if(!res.ok) throw new Error("Weather HTTP "+res.status);
     state.weather=await res.json();
+    state.weather._city=resolvedName;
   }catch(err){ console.warn(err); state.weather=null; }
 }
 function wmo(code,isNight=false){
@@ -493,7 +509,7 @@ function weatherMarkup(){
   }
   return '<div class="weather-body"><div class="weather-today-title">Сегодня, '+e(fmtDate(isoDateMoscow(),{day:"numeric",month:"long",weekday:"long"}))+'</div>'+
     '<div class="period-grid">'+ps.map(p=>'<div class="period"><div class="period-name">'+e(p.name)+'</div><div class="weather-icon">'+p.icon+'</div><div class="temp">'+(p.temp>=0?"+":"")+e(p.temp)+'°</div><div class="condition">'+e(p.text)+'</div><div class="precip">Осадки '+e(p.precip)+'%</div></div>').join("")+'</div>'+
-    '<div class="week-title">Прогноз на 7 дней</div><div class="week-list">'+week+'</div></div>';
+    +(state.settings?.show_week_forecast===false?'':'<div class="week-title">Прогноз на 7 дней</div><div class="week-list">'+week+'</div>')+'</div>';
 }
 function renderDashboard(){
   const favorites=state.favorites.slice(0,5), research=state.research.slice(0,6), events=filterItems(state.events,"event").slice(0,14);
@@ -505,7 +521,7 @@ function renderDashboard(){
     '<section class="panel" id="events-panel"><div class="panel-head"><div class="panel-title-wrap"><span class="panel-icon blue">▣</span><div><div class="panel-title">События — ближайшие 14 дней</div><div class="panel-sub desktop-only">Актуальные события в Москве и МО</div></div></div><button class="link-btn" data-nav="#/search?source=event">Все события&nbsp; →</button></div><div class="event-list desktop-event-list">'+groupEvents(events)+'</div><div class="mobile-event-list mobile-only">'+mobileEvents(events)+'</div></section>'+
     '<div class="dash-right">'+
       '<section class="panel" id="budget-panel"><div class="panel-head"><div class="panel-title-wrap"><span class="panel-icon blue">'+icon("wallet")+'</span><div class="panel-title">Бюджет месяца</div></div><button class="link-btn" data-nav="#/settings">Настроить&nbsp; →</button></div>'+budgetMarkup()+'</section>'+
-      '<section class="panel" id="weather-panel"><div class="panel-head"><div class="panel-title-wrap"><span class="panel-icon">🌤️</span><div><div class="panel-title">Погода в Москве</div><div class="panel-sub">Источник: Open‑Meteo</div></div></div><button class="link-btn">Открыть на карте&nbsp; →</button></div>'+weatherMarkup()+'</section>'+
+      '<section class="panel" id="weather-panel"><div class="panel-head"><div class="panel-title-wrap"><span class="panel-icon">🌤️</span><div><div class="panel-title">Погода в '+e(state.weather?._city||state.settings?.weather_city||"Москве")+'</div><div class="panel-sub">Источник: Open‑Meteo</div></div></div><button class="link-btn">Открыть на карте&nbsp; →</button></div>'+weatherMarkup()+'</section>'+
     '</div></div>';
   shell(view,"home",true);
 }
