@@ -1254,7 +1254,7 @@ async function exportUserData(){
   const btn=document.querySelector("#export-data");
   if(btn){btn.disabled=true;btn.dataset.oldText=btn.innerHTML;btn.innerHTML='Подготавливаю экспорт…';}
   try{
-    const tables=["app004_settings","app004_favorite_projection","app004_research","app004_visits","app004_budget_versions","app004_budget_months","app004_accounting_transactions","app004_commitments","app004_shared_expenses","app004_shared_receivables","app004_payables"];
+    const tables=["app004_settings","app004_favorite_projection","app004_event_favorites","app004_research","app004_visits","app004_budget_versions","app004_budget_months","app004_accounting_transactions","app004_commitments","app004_shared_expenses","app004_shared_receivables","app004_payables"];
     const out={exported_at:new Date().toISOString(),app:"APP-004",data:{}};
     for(const table of tables){
       const {data,error}=await supabase.from(table).select("*");
