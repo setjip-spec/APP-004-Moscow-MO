@@ -14,6 +14,7 @@ const state = {
   favorites: [],
   research: [],
   events: [],
+  eventFavorites: [],
   visits: [],
   settings: null,
   budget: null,
@@ -408,15 +409,17 @@ async function loadAll(){
     ]);
     if(se) throw se;
     state.settings=settings||{};
-    const [fp,rs,es,vs,bm,bv]=await Promise.all([
+    const [fp,rs,es,vs,bm,bv,ef]=await Promise.all([
       supabase.from("app004_favorite_projection").select("*").eq("active_verified",true),
       supabase.from("app004_research").select("*").eq("active",true).order("research_code",{ascending:true}),
       supabase.from("app004_event_occurrences").select("*").eq("projection_state","SHOW").order("starts_at",{ascending:true,nullsFirst:false}).limit(80),
       supabase.from("app004_visits").select("*").order("visit_date",{ascending:false,nullsFirst:false}).order("visit_code",{ascending:true}),
       supabase.from("app004_budget_months").select("*").eq("month",isoMonthNow()).maybeSingle(),
-      supabase.from("app004_budget_versions").select("*").lte("effective_month",isoMonthNow()).order("effective_month",{ascending:false}).order("created_at",{ascending:false}).limit(1)
+      supabase.from("app004_budget_versions").select("*").lte("effective_month",isoMonthNow()).order("effective_month",{ascending:false}).order("created_at",{ascending:false}).limit(1),
+      supabase.from("app004_event_favorites").select("*")
     ]);
-    for(const x of [fp,rs,es,vs,bm,bv]) if(x.error) throw x.error;
+    for(const x of [fp,rs,es,vs,bm,bv,ef]) if(x.error) throw x.error;
+    state.eventFavorites=ef.data||[];
     const projections=fp.data||[];
     const researchRows=rs.data||[], eventRows=es.data||[];
     const expIds=projections.map(x=>x.experience_id).filter(Boolean);
@@ -491,8 +494,43 @@ function eventDateRangeLabel(ev){
   }
   return "";
 }
+function eventSeriesIsRecurring(ev){
+  if(!ev?.series_id) return false;
+  const same=state.events.filter(x=>x.series_id===ev.series_id).length;
+  return same>1 || String(ev.occurrence_status||"").toUpperCase()==="ON_DEMAND" || /ROLLING/i.test(String(ev.offer_type||""));
+}
+function eventFavoriteTarget(ev){
+  return eventSeriesIsRecurring(ev)?{series_id:ev.series_id,occurrence_id:null}:{series_id:null,occurrence_id:ev.id};
+}
+function eventFavoriteRow(ev){
+  if(!ev) return null;
+  if(ev.series_id){
+    const series=state.eventFavorites.find(x=>x.series_id===ev.series_id);
+    if(series) return series;
+  }
+  return state.eventFavorites.find(x=>x.occurrence_id===ev.id)||null;
+}
+function isEventFavorite(ev){ return !!eventFavoriteRow(ev); }
+async function toggleEventFavorite(ev){
+  if(!ev) return;
+  const existing=eventFavoriteRow(ev);
+  if(existing){
+    const {error}=await supabase.from("app004_event_favorites").delete().eq("id",existing.id);
+    if(error){toast("Не удалось убрать событие из избранного: "+error.message,true);return;}
+    state.eventFavorites=state.eventFavorites.filter(x=>x.id!==existing.id);
+  }else{
+    const target=eventFavoriteTarget(ev);
+    const {data,error}=await supabase.from("app004_event_favorites").insert({user_id:state.session.user.id,...target}).select("*").single();
+    if(error){toast("Не удалось добавить событие в избранное: "+error.message,true);return;}
+    state.eventFavorites.push(data);
+  }
+  state.events=sortLiveEvents(state.events);
+  renderCurrent();
+}
 function sortLiveEvents(items){
   return [...items].sort((a,b)=>{
+    const fa=isEventFavorite(a)?1:0,fb=isEventFavorite(b)?1:0;
+    if(fa!==fb) return fb-fa;
     const ka=eventDisplayKey(a),kb=eventDisplayKey(b);
     if(ka!==kb) return ka.localeCompare(kb);
     const sa=a.starts_at||"",sb=b.starts_at||"";
@@ -581,7 +619,7 @@ function eventCard(ev){
       '<div class="event-tags"><span class="badge '+(ev.category?.includes("конц")?"red":"orange")+'">'+e(ev.category||"Событие")+'</span>'+
       '<span class="badge blue">'+e(ev.supports_together===false?"Один":"Вместе")+'</span>'+
       '<span class="badge '+(price===0?"green":"gray")+'">'+e(money(price))+'</span></div></div>'+
-    '<button class="details-btn" data-detail="event:'+e(ev.id)+'">Подробнее&nbsp; →</button>'+
+    '<div class="event-actions"><button class="event-heart '+(isEventFavorite(ev)?"active":"")+'" data-event-favorite="'+e(ev.id)+'" title="Избранное">'+(isEventFavorite(ev)?"♥":"♡")+'</button><button class="details-btn" data-detail="event:'+e(ev.id)+'">Подробнее&nbsp; →</button></div>'+
   '</article>';
 }
 function mobileEvents(events){
@@ -594,7 +632,7 @@ function mobileEvents(events){
     const price=ev.is_free?0:(ev.current_price??ev.regular_price);
     return '<article class="mobile-event-slide" data-detail="event:'+e(ev.id)+'">'+
       '<div class="mobile-event-visual"><img src="'+e(safeImg(ev.cover_url))+'" alt="" loading="lazy" onerror="this.src=\''+FALLBACK_IMAGE+'\'">'+
-        '<div class="mobile-date-badge"><b>'+e(day)+'</b><span>'+e(mon)+'</span><small>'+e(wd)+'</small></div><div class="mobile-heart">♡</div></div>'+
+        '<div class="mobile-date-badge"><b>'+e(day)+'</b><span>'+e(mon)+'</span><small>'+e(wd)+'</small></div><button class="mobile-heart '+(isEventFavorite(ev)?"active":"")+'" data-event-favorite="'+e(ev.id)+'">'+(isEventFavorite(ev)?"♥":"♡")+'</button></div>'+
       '<div class="mobile-event-copy"><div class="event-title">'+e(ev.title)+'</div>'+
         (eventDateRangeLabel(ev)?'<div class="meta-line event-live-label">'+icon("calendar")+e(eventDateRangeLabel(ev))+'</div>':'')+
         '<div class="meta-line">'+icon("clock")+e(ev.time_text||"Время уточняется")+'</div>'+
@@ -915,7 +953,7 @@ function resultRow(item,type,index){
     '<span><span class="source-cell source-'+type+'">'+(type==="favorite"?"⌂":type==="research"?"●":"♜")+' '+e(sourceLabel(type))+'</span></span>'+
     '<span class="result-district">'+e(districtFor(item,type))+'</span><b class="result-price '+(Number(price)===0?"free":"")+'">'+e(money(price))+'</b>'+
     '<span>'+e(type==="research"?(item.travel_one_way_text||"—"):"—")+'</span><span>'+e(type==="research"?(item.total_duration_text||item.duration_on_site_text||"—"):durationFor(item,type))+'</span>'+
-    '<span class="rating">'+(rating!==null?"★ "+e(rating):"—")+'</span><span class="atmo-cell">'+(atmosphere.length?atmosphere.map(t=>'<i>'+e(t)+'</i>').join(""):'<i class="empty-atmo">—</i>')+'</span><span class="heart">♡</span></article>';
+    '<span class="rating">'+(rating!==null?"★ "+e(rating):"—")+'</span><span class="atmo-cell">'+(atmosphere.length?atmosphere.map(t=>'<i>'+e(t)+'</i>').join(""):'<i class="empty-atmo">—</i>')+'</span><span class="heart">'+(type==="event"?'<button class="result-heart '+(isEventFavorite(item)?"active":"")+'" data-event-favorite="'+e(item.id)+'">'+(isEventFavorite(item)?"♥":"♡")+'</button>':'♡')+'</span></article>';
 }
 
 function historySearchPanel(){
@@ -1245,6 +1283,12 @@ function renderCurrent(){
 }
 
 root.addEventListener("click",async ev=>{
+  const favEvent=ev.target.closest("[data-event-favorite]");
+  if(favEvent){
+    ev.preventDefault();ev.stopPropagation();
+    const event=state.events.find(x=>x.id===favEvent.dataset.eventFavorite);
+    await toggleEventFavorite(event); return;
+  }
   const nav=ev.target.closest("[data-nav]");
   if(nav){ ev.preventDefault(); go(nav.dataset.nav); return; }
   const detail=ev.target.closest("[data-detail]");
@@ -1324,7 +1368,7 @@ async function init(){
       const changed=(state.session?.access_token||"")!==(sessionNow?.access_token||"");
       state.session=sessionNow;
       if(changed && sessionNow){ await loadAll(); }
-      if(!sessionNow){ state.favorites=[];state.research=[];state.events=[];state.visits=[];state.settings=null;state.budget=null; }
+      if(!sessionNow){ state.favorites=[];state.research=[];state.events=[];state.eventFavorites=[];state.visits=[];state.settings=null;state.budget=null; }
       renderCurrent();
     },0);
   });
