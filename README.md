@@ -3,7 +3,7 @@
 Пользовательское приложение выбора досуга в Москве и Московской области.
 
 ## Статус
-**BACKEND PARITY COMPLETE / FRONTEND NEXT.**
+**FRONTEND BETA / INTEGRATION QA PASSED.**
 
 ## Целевая архитектура
 - GitHub `main` — канонический код и документация.
@@ -65,3 +65,33 @@ Security/performance hardening completed for APP-004:
 Next: runtime media/weather/events, then frontend matching the six approved UI PNG references.
 
 See `docs/BACKEND-REPORT.md`.
+
+
+## Frontend beta v0.4
+
+Frontend SPA реализован и подключён к реальному Supabase runtime.
+
+Визуальный контракт:
+- frontend повторяет шесть approved PNG из `03_UI_REFERENCE/APPROVED`;
+- Dashboard / Search / History / Detail / Mobile Dashboard / Settings имеют отдельную реализацию;
+- Visual TZ дополняет невидимые на PNG поведенческие детали.
+
+Функционально подключены:
+- Auth + RLS;
+- Favorite / Research / Events / Visits;
+- canonical Search filters;
+- History filters;
+- budget Settings через transactional RPC;
+- Open-Meteo weather;
+- RLS-safe data export;
+- media fallback.
+
+Ограничения канона не маскируются:
+- `04_CONTENT_IMAGES` пока пуст;
+- 21 imported legacy Visits пока не имеют `visit_total`;
+- неподтверждённые Search-фильтры отключены.
+
+См. `docs/FRONTEND-REPORT.md`.
+
+Live runtime:
+https://setjip-spec.github.io/APP-004-Moscow-MO/
