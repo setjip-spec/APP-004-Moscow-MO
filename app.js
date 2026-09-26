@@ -106,6 +106,10 @@ function safeHref(url){
   }catch{}
   return "";
 }
+function displayImageUrl(item){
+  if(state.settings?.show_images===false) return "";
+  return safeHref(item?.cover_url||"");
+}
 function tempFmt(v){
   const x=Number(v);
   if(!Number.isFinite(x)) return "—";
@@ -442,8 +446,10 @@ async function loadAll(){
       const ex=expMap.get(p.experience_id)||{}, pl=placeMap.get(ex.place_id)||{};
       return {...ex,...p,title:pl.name||ex.variant_name||ex.parent_activity||"Без названия",district_city:pl.district_city,nearest_transit:pl.nearest_transit,official_url:pl.official_url,_place:pl};
     });
+    const seriesCounts=new Map();
+    for(const ev of eventRows) if(ev.series_id) seriesCounts.set(ev.series_id,(seriesCounts.get(ev.series_id)||0)+1);
     state.research=researchRows.map(x=>({...x,_place:placeMap.get(x.place_id)||null}));
-    state.events=sortLiveEvents(eventRows.filter(x=>eventStillCurrent(x)).map(x=>({...x,_place:placeMap.get(x.place_id)||null})));
+    state.events=sortLiveEvents(eventRows.filter(x=>eventStillCurrent(x)).map(x=>({...x,_place:placeMap.get(x.place_id)||null,_seriesCount:x.series_id?(seriesCounts.get(x.series_id)||1):0})));
     state.visits=vs.data||[];
     state.budget=bm.data||null;
     state.budgetVersion=(bv.data||[])[0]||null;
@@ -496,8 +502,7 @@ function eventDateRangeLabel(ev){
 }
 function eventSeriesIsRecurring(ev){
   if(!ev?.series_id) return false;
-  const same=state.events.filter(x=>x.series_id===ev.series_id).length;
-  return same>1 || String(ev.occurrence_status||"").toUpperCase()==="ON_DEMAND" || /ROLLING/i.test(String(ev.offer_type||""));
+  return Number(ev._seriesCount||0)>1 || String(ev.occurrence_status||"").toUpperCase()==="ON_DEMAND" || /ROLLING/i.test(String(ev.offer_type||""));
 }
 function eventFavoriteTarget(ev){
   return eventSeriesIsRecurring(ev)?{series_id:ev.series_id,occurrence_id:null}:{series_id:null,occurrence_id:ev.id};
@@ -594,10 +599,10 @@ function weatherPeriod(hour,name){
 }
 
 function miniCard(item,type){
-  const title=itemTitle(item,type), price=priceFor(item,type), duration=durationFor(item,type), district=districtFor(item,type);
+  const title=itemTitle(item,type), price=priceFor(item,type), duration=durationFor(item,type), district=districtFor(item,type), image=displayImageUrl(item);
   const stateName=item.main_state||item.parent_activity||item.primary_activity||item.category||"";
-  return '<article class="mini-card" data-detail="'+type+":"+e(item.id)+'">'+
-    '<img class="thumb" src="'+e(safeImg(item.cover_url))+'" alt="" loading="lazy" onerror="this.src=\''+FALLBACK_IMAGE+'\'">'+
+  return '<article class="mini-card '+(image?"has-image":"no-image")+'" data-detail="'+type+":"+e(item.id)+'">'+
+    (image?'<img class="thumb" src="'+e(image)+'" alt="" loading="lazy" onerror="this.style.display=\'none\';this.closest(\'.mini-card\')?.classList.add(\'image-failed\')">':'')+
     '<div class="mini-main"><div class="mini-title">'+e(title)+'</div><div class="meta-line">'+
       (item.rating?'<span class="rating">★ '+e(item.rating)+'</span>':'')+
       (stateName?'<span class="badge blue">'+e(stateName)+'</span>':'')+
@@ -609,9 +614,9 @@ function miniCard(item,type){
   '</article>';
 }
 function eventCard(ev){
-  const price=ev.is_free?0:(ev.current_price??ev.regular_price);
-  return '<article class="event-card" data-detail="event:'+e(ev.id)+'">'+
-    '<img class="event-thumb" src="'+e(safeImg(ev.cover_url))+'" alt="" loading="lazy" onerror="this.src=\''+FALLBACK_IMAGE+'\'">'+
+  const price=ev.is_free?0:(ev.current_price??ev.regular_price), image=displayImageUrl(ev);
+  return '<article class="event-card '+(image?"has-image":"no-image")+'" data-detail="event:'+e(ev.id)+'">'+
+    (image?'<img class="event-thumb" src="'+e(image)+'" alt="" loading="lazy" onerror="this.style.display=\'none\';this.closest(\'.event-card\')?.classList.add(\'image-failed\')">':'')+
     '<div><div class="event-title">'+e(ev.title)+'</div>'+
       (eventDateRangeLabel(ev)?'<div class="meta-line event-live-label">'+icon("calendar")+e(eventDateRangeLabel(ev))+'</div>':'')+
       '<div class="meta-line">'+icon("clock")+e(ev.time_text||fmtDate(ev.starts_at,{hour:"2-digit",minute:"2-digit"}))+'</div>'+
@@ -625,15 +630,16 @@ function eventCard(ev){
 function mobileEvents(events){
   if(!events.length) return '<div class="empty-state">Актуальных событий пока нет.</div>';
   return events.slice(0,8).map(ev=>{
-    const key=eventDisplayKey(ev),d=dateFromMoscowKey(key);
+    const key=eventDisplayKey(ev),d=dateFromMoscowKey(key),image=displayImageUrl(ev);
     const day=d?new Intl.DateTimeFormat("ru-RU",{timeZone:"Europe/Moscow",day:"2-digit"}).format(d):"•";
     const mon=d?new Intl.DateTimeFormat("ru-RU",{timeZone:"Europe/Moscow",month:"short"}).format(d):"по записи";
     const wd=d?new Intl.DateTimeFormat("ru-RU",{timeZone:"Europe/Moscow",weekday:"short"}).format(d):"";
     const price=ev.is_free?0:(ev.current_price??ev.regular_price);
-    return '<article class="mobile-event-slide" data-detail="event:'+e(ev.id)+'">'+
-      '<div class="mobile-event-visual"><img src="'+e(safeImg(ev.cover_url))+'" alt="" loading="lazy" onerror="this.src=\''+FALLBACK_IMAGE+'\'">'+
-        '<div class="mobile-date-badge"><b>'+e(day)+'</b><span>'+e(mon)+'</span><small>'+e(wd)+'</small></div><button class="mobile-heart '+(isEventFavorite(ev)?"active":"")+'" data-event-favorite="'+e(ev.id)+'">'+(isEventFavorite(ev)?"♥":"♡")+'</button></div>'+
-      '<div class="mobile-event-copy"><div class="event-title">'+e(ev.title)+'</div>'+
+    return '<article class="mobile-event-slide '+(image?"has-image":"no-image")+'" data-detail="event:'+e(ev.id)+'">'+
+      (image?'<div class="mobile-event-visual"><img src="'+e(image)+'" alt="" loading="lazy" onerror="this.style.display=\'none\'">'+
+        '<div class="mobile-date-badge"><b>'+e(day)+'</b><span>'+e(mon)+'</span><small>'+e(wd)+'</small></div><button class="mobile-heart '+(isEventFavorite(ev)?"active":"")+'" data-event-favorite="'+e(ev.id)+'">'+(isEventFavorite(ev)?"♥":"♡")+'</button></div>':'')+
+      '<div class="mobile-event-copy">'+(!image?'<div class="mobile-noimage-head"><span class="mobile-date-inline"><b>'+e(day)+'</b> '+e(mon)+' · '+e(wd)+'</span><button class="mobile-heart inline '+(isEventFavorite(ev)?"active":"")+'" data-event-favorite="'+e(ev.id)+'">'+(isEventFavorite(ev)?"♥":"♡")+'</button></div>':'')+
+        '<div class="event-title">'+e(ev.title)+'</div>'+
         (eventDateRangeLabel(ev)?'<div class="meta-line event-live-label">'+icon("calendar")+e(eventDateRangeLabel(ev))+'</div>':'')+
         '<div class="meta-line">'+icon("clock")+e(ev.time_text||"Время уточняется")+'</div>'+
         '<div class="meta-line">'+icon("pin")+e(districtFor(ev,"event"))+'</div>'+
@@ -946,10 +952,10 @@ function rangeVisual(min,max,width){
 }
 function filterSection(title,body){ return '<div class="filter-section"><h4>'+e(title)+'</h4>'+body+'</div>'; }
 function resultRow(item,type,index){
-  const atmosphere=atmosphereLabels(item);
-  const price=priceFor(item,type);
-  const rating=item.rating ?? null;
-  return '<article class="result-row" data-detail="'+type+":"+e(item.id)+'"><span class="result-num">'+e(index)+'</span><div class="result-item"><img class="result-thumb" src="'+e(safeImg(item.cover_url))+'" alt="" onerror="this.src=\''+FALLBACK_IMAGE+'\'"><div><div class="result-title">'+e(itemTitle(item,type))+'</div><div class="meta-line">'+icon("pin")+e(item.parent_activity||item.primary_activity||item.category||"")+'</div><div class="meta-line">'+e(item.season||item.time_of_day||"Круглый год")+'</div></div></div>'+
+  const atmosphere=atmosphereLabels(item), price=priceFor(item,type), rating=item.rating ?? null, image=displayImageUrl(item);
+  return '<article class="result-row '+(image?"has-image":"no-image")+'" data-detail="'+type+":"+e(item.id)+'"><span class="result-num">'+e(index)+'</span><div class="result-item '+(image?"has-image":"no-image")+'">'+
+    (image?'<img class="result-thumb" src="'+e(image)+'" alt="" onerror="this.style.display=\'none\';this.closest(\'.result-item\')?.classList.add(\'image-failed\')">':'')+
+    '<div><div class="result-title">'+e(itemTitle(item,type))+'</div><div class="meta-line">'+icon("pin")+e(item.parent_activity||item.primary_activity||item.category||"")+'</div><div class="meta-line">'+e(item.season||item.time_of_day||"Круглый год")+'</div></div></div>'+
     '<span><span class="source-cell source-'+type+'">'+(type==="favorite"?"⌂":type==="research"?"●":"♜")+' '+e(sourceLabel(type))+'</span></span>'+
     '<span class="result-district">'+e(districtFor(item,type))+'</span><b class="result-price '+(Number(price)===0?"free":"")+'">'+e(money(price))+'</b>'+
     '<span>'+e(type==="research"?(item.travel_one_way_text||"—"):"—")+'</span><span>'+e(type==="research"?(item.total_duration_text||item.duration_on_site_text||"—"):durationFor(item,type))+'</span>'+
@@ -1087,7 +1093,7 @@ function renderDetail(){
   const repeatText=lastVisit?.repeat_verdict||"Нет данных";
   const road=type==="research"?(item.travel_one_way_text||"—"):"—";
   const totalTime=type==="research"?(item.total_duration_text||item.duration_on_site_text||"—"):durationFor(item,type);
-  const galleryImg=e(safeImg(item.cover_url));
+  const mediaUrl=displayImageUrl(item), galleryImg=e(mediaUrl);
 
   const actions=(actionUrl
     ?'<a class="detail-primary-action" href="'+e(actionUrl)+'" target="_blank" rel="noopener noreferrer">▣ '+e(primaryLabel)+'</a>'
@@ -1096,8 +1102,7 @@ function renderDetail(){
 
   const view='<div class="detail-page">'+
     '<div class="detail-main-area"><section class="panel detail-hero-card"><button class="back-results" data-nav="#/search">← Назад к результатам</button>'+
-      '<div class="detail-hero-grid"><div class="detail-gallery"><div class="hero-wrap"><img class="hero-img" src="'+galleryImg+'" alt="" onerror="this.src=\''+FALLBACK_IMAGE+'\'"><button class="gallery-arrow left">‹</button><button class="gallery-arrow right">›</button><span class="gallery-count">1 / 12</span></div>'+
-        '<div class="gallery-strip">'+[0,1,2,3,4,5,6].map(()=>'<img src="'+galleryImg+'" alt="" onerror="this.src=\''+FALLBACK_IMAGE+'\'">').join("")+'</div></div>'+
+      '<div class="detail-hero-grid '+(mediaUrl?"has-media":"no-media")+'">'+(mediaUrl?'<div class="detail-gallery"><div class="hero-wrap"><img class="hero-img" src="'+galleryImg+'" alt="" onerror="this.closest(\'.detail-gallery\')?.remove()"><button class="gallery-arrow left">‹</button><button class="gallery-arrow right">›</button><span class="gallery-count">1</span></div><div class="gallery-strip"><img src="'+galleryImg+'" alt=""></div></div>':'')+
       '<div class="detail-copy"><div class="detail-topline"><span class="badge blue">★ '+e(sourceLabel(type))+'</span><span class="detail-rating">★ <b>'+e(item.rating||"—")+'</b><small>'+e(item.rating?"оценка":"нет оценки")+'</small></span></div>'+
         '<div class="detail-name">'+e(title)+'</div><div class="detail-kind">'+e(item.parent_activity||item.primary_activity||item.category||"")+'</div>'+
         '<div class="detail-context"><span>'+icon("pin")+e(districtFor(item,type))+'</span><span class="badge gray">'+e(item.environment||"")+'</span><span class="badge gray">'+e(item.social_format||"Для всех")+'</span></div>'+
