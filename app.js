@@ -642,6 +642,7 @@ function dashboardQuickChip(key,label){
   return '<button class="chip-btn '+(state.dashboardQuick===key?"active":"")+'" data-dashboard-quick="'+key+'">'+label+'</button>';
 }
 function shell(view,active="home",includeSearch=true){
+  document.body.classList.remove("filter-overlay-open");
   const mode=active==="home"?"dashboard":"search";
   root.innerHTML=headerMarkup(active)+'<main class="shell">'+(includeSearch?searchPanelMarkup(mode):"")+'<div class="view">'+view+'</div></main>';
 }
@@ -1333,6 +1334,7 @@ function renderSearch(){
       :'<div class="result-head"><span>#</span><span>Место / событие</span><span>Источник</span><span>Район / город</span><span>Цена с дорогой</span><span>Дорога</span><span>Всего</span><span>Рейтинг</span><span>Атмосфера</span><span></span></div>'+(rows||'<div class="empty-state">По текущим фильтрам ничего не найдено.</div>'))+
     '</section></div>';
   shell(view,"search",true);
+  document.body.classList.toggle("filter-overlay-open",state.filterDrawerOpen);
   const sort=document.querySelector("#result-sort"); if(sort) sort.value=state.resultSort;
   if(state.resultView==="map"){
     setTimeout(async()=>{
