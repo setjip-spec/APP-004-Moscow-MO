@@ -235,8 +235,13 @@ function itemPlace(item){
   return item?._place||null;
 }
 function placeCoords(place){
-  const lat=Number(place?.latitude),lng=Number(place?.longitude);
-  return Number.isFinite(lat)&&Number.isFinite(lng)?[lat,lng]:null;
+  if(!place) return null;
+  if(place.latitude===null||place.latitude===undefined||place.latitude===""||place.longitude===null||place.longitude===undefined||place.longitude==="") return null;
+  const lat=Number(place.latitude),lng=Number(place.longitude);
+  if(!Number.isFinite(lat)||!Number.isFinite(lng)) return null;
+  if(lat<-90||lat>90||lng<-180||lng>180) return null;
+  if(Math.abs(lat)<0.0001&&Math.abs(lng)<0.0001) return null;
+  return [lat,lng];
 }
 function geocodeQuery(place){
   if(!place) return "";
@@ -275,31 +280,51 @@ async function buildLeafletMap(containerId,entries,{maxGeocode=20}={}){
   const box=document.getElementById(containerId);
   if(!box) return;
   if(!window.L){ box.innerHTML='<div class="empty-state">Карта не загрузилась. Проверьте соединение.</div>'; return; }
-  const map=L.map(box,{zoomControl:true}).setView([55.7558,37.6176],10);
-  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19,attribution:'&copy; OpenStreetMap contributors'}).addTo(map);
+
+  const map=L.map(box,{zoomControl:true,preferCanvas:true}).setView([55.7558,37.6176],10);
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{
+    maxZoom:19,
+    attribution:'&copy; OpenStreetMap contributors'
+  }).addTo(map);
+
   const bounds=[],missing=[];
+  const addPoint=(entry,coords)=>{
+    const marker=L.circleMarker(coords,{
+      radius:8,weight:2,color:"#ffffff",fillColor:isPinned(entry.item,entry.type)?"#e83f55":"#187eea",fillOpacity:1
+    }).addTo(map).bindPopup(mapPopupHtml(entry.item,entry.type));
+    marker.on("click",()=>{});
+    bounds.push(coords);
+  };
+
   for(const entry of entries){
     const pl=itemPlace(entry.item),coords=placeCoords(pl);
-    if(coords){
-      L.marker(coords).addTo(map).bindPopup(mapPopupHtml(entry.item,entry.type));
-      bounds.push(coords);
-    }else if(pl?.id) missing.push(entry);
+    if(coords) addPoint(entry,coords);
+    else if(pl?.id) missing.push(entry);
   }
-  if(bounds.length) map.fitBounds(bounds,{padding:[28,28],maxZoom:14});
+
+  const refit=()=>{
+    requestAnimationFrame(()=>map.invalidateSize(true));
+    setTimeout(()=>map.invalidateSize(true),120);
+    if(bounds.length===1) map.setView(bounds[0],13);
+    else if(bounds.length>1) map.fitBounds(bounds,{padding:[42,42],maxZoom:13});
+    else map.setView([55.7558,37.6176],10);
+  };
+  refit();
+
   const status=document.querySelector('[data-map-status="'+containerId+'"]');
-  if(status) status.textContent=missing.length?"Определяю координаты для "+Math.min(maxGeocode,missing.length)+" точек…":"Все доступные точки нанесены.";
-  let done=0;
+  if(status){
+    if(!entries.length) status.textContent="По текущим фильтрам точек нет. Показана Москва.";
+    else if(missing.length) status.textContent="Нанесено "+bounds.length+" • определяю координаты ещё для "+Math.min(maxGeocode,missing.length)+" точек…";
+    else status.textContent="На карте "+bounds.length+" точек.";
+  }
+
   for(const entry of missing.slice(0,maxGeocode)){
     const coords=await geocodePlace(itemPlace(entry.item));
-    if(coords){
-      L.marker(coords).addTo(map).bindPopup(mapPopupHtml(entry.item,entry.type));
-      bounds.push(coords);done++;
-      if(bounds.length===1) map.setView(coords,13); else map.fitBounds(bounds,{padding:[28,28],maxZoom:14});
-    }
-    if(status) status.textContent="Карта: "+bounds.length+" точек"+(missing.length>maxGeocode?" • ещё координаты будут дозаполнены при следующих открытиях":"");
-    await sleep(1100);
+    if(coords){ addPoint(entry,coords); refit(); }
+    if(status) status.textContent="На карте "+bounds.length+" точек"+(missing.length>maxGeocode?" • остальные координаты дозаполнятся при следующих открытиях":"");
+    await sleep(1050);
   }
-  if(status && !bounds.length) status.textContent="Не удалось подтвердить координаты для текущей выборки.";
+  if(status && entries.length && !bounds.length) status.textContent="Для текущей выборки координаты пока не подтверждены. Карта оставлена на Москве.";
 }
 function parseNumberList(text){
   if(text===null||text===undefined) return [];
@@ -1212,6 +1237,29 @@ function findItem(type,id){
   const arr=type==="favorite"?state.favorites:type==="research"?state.research:state.events;
   return arr.find(x=>x.id===id)||null;
 }
+function strongestEmotionText(item){
+  const defs=[["Радость","joy_score"],["Умиротворение","calm_score"],["Поток","flow_score"],["Удовольствие","pleasure_score"],["Облегчение","relief_score"],["Довольство","satisfaction_score"],["Смысл","meaning_score"],["Живость","vitality_score"]];
+  const rows=defs.map(([label,key])=>({label,value:scoreValue(item,key)})).filter(x=>x.value!==null&&x.value>0).sort((a,b)=>b.value-a.value).slice(0,3);
+  return rows.map(x=>x.label+" "+x.value+"/5").join(" • ");
+}
+function detailExplanationMarkup(item,type){
+  const kind=item.experience_subtype||item.experience_class||item.parent_activity||item.primary_activity||item.category||sourceLabel(type);
+  const place=districtFor(item,type);
+  const what=[kind,item.environment,item.access_format].filter(Boolean).join(" • ");
+  const emotions=strongestEmotionText(item);
+  const atmosphere=atmosphereLabels(item).join(", ");
+  const receive=[
+    item.main_state?("главное состояние — "+item.main_state):"",
+    emotions,
+    atmosphere?("атмосфера: "+atmosphere):""
+  ].filter(Boolean).join("; ");
+  const why=item.profile_reason||item.hypothesis||item.what_to_check||item.best_configuration||item.user_comment||item.comment||item.result_summary||"";
+  return '<div class="detail-explain-grid">'+
+    '<div><b>Что это</b><p>'+e(what||("Карточка "+sourceLabel(type).toLowerCase()))+(place?'<br><span>'+e(place)+'</span>':'')+'</p></div>'+
+    '<div><b>Что я здесь получу</b><p>'+e(receive||"Эффект пока не описан отдельным подтверждённым полем.")+'</p></div>'+
+    '<div><b>Почему мне может понравиться</b><p>'+e(why||"Причина соответствия профилю пока не заполнена в каноне.")+'</p></div>'+
+  '</div>';
+}
 function renderDetail(){
   const r=route(), type=r.params.get("type")||"research", id=r.params.get("id");
   const item=findItem(type,id);
@@ -1244,7 +1292,7 @@ function renderDetail(){
         '<div class="detail-name">'+e(title)+'</div><div class="detail-kind">'+e(item.parent_activity||item.primary_activity||item.category||"")+'</div>'+
         '<div class="detail-context"><span>'+icon("pin")+e(districtFor(item,type))+'</span><span class="badge gray">'+e(item.environment||"")+'</span><span class="badge gray">'+e(item.social_format||"Для всех")+'</span></div>'+
         '<div class="detail-labels">'+tags.map((t,i)=>'<span class="badge '+(["orange","blue","violet","red","green"][i%5])+'">'+e(t)+'</span>').join("")+'</div>'+
-        '<p class="detail-description">'+e(description)+'</p><div class="detail-actions">'+actions+'</div></div></div></section>'+
+        '<p class="detail-description">'+e(description)+'</p>'+detailExplanationMarkup(item,type)+'<div class="detail-actions">'+actions+'</div></div></div></section>'+
       '<div class="detail-lower"><section class="panel emotions-card"><div class="detail-section-title">Главное состояние и эмоции <span>?</span></div><div class="main-state-box"><b>'+e(item.main_state||"Главное состояние не указано")+'</b><small>'+e(item.parent_activity||item.primary_activity||"")+'</small></div>'+emotionMarkup(item)+'<h4>Атмосфера</h4><div class="detail-labels">'+tags.slice(1).map(t=>'<span class="badge blue">'+e(t)+'</span>').join("")+'</div></section>'+
         '<div class="detail-center-stack"><section class="panel pros-cons"><div><h3>👍 Почему стоит идти</h3>'+bulletText(why,"good")+'</div><div><h3>⚠ Что может не понравиться</h3>'+bulletText(downside,"bad")+'</div></section>'+
           '<section class="panel route-card"><h3>📍 Как добраться</h3><div class="route-options">'+routeOption("На метро",districtFor(item,type),road)+routeOption("На авто","Маршрут рядом","~ 35 мин")+routeOption("Общественный транспорт","Автобусы, электробусы",road)+'</div><div class="route-bottom">'+(mapUrl?'<a class="outline-btn" href="'+e(mapUrl)+'" target="_blank" rel="noopener noreferrer">⌖ Показать маршрут на карте</a>':'<button class="outline-btn" type="button" data-focus-map>⌖ Показать на карте</button>')+'<div class="detail-map-wrap"><div id="detail-map" class="detail-map"></div><div class="map-status" data-map-status="detail-map">Подготавливаю карту…</div></div></div></section></div>'+
