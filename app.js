@@ -1330,13 +1330,15 @@ function renderSearch(){
       advancedChips.map(x=>'<span class="active-chip">'+e(x)+' ×</span>').join("")+
     '</div><div class="sort-line"><span>Сортировка:</span><select class="select" id="result-sort"><option value="relevance">По релевантности</option><option value="price">По цене</option><option value="rating">По рейтингу</option><option value="name">По названию</option></select></div></div>'+
     (state.resultView==="map"
-      ?'<div class="map-result-wrap"><div id="search-map" class="search-map"></div><div class="map-status" data-map-status="search-map">Подготавливаю карту…</div></div>'
+      ?(state.filterDrawerOpen
+        ?'<div class="map-result-wrap map-suspended"><div class="map-suspended-note">Карта временно скрыта, пока открыты фильтры</div></div>'
+        :'<div class="map-result-wrap"><div id="search-map" class="search-map"></div><div class="map-status" data-map-status="search-map">Подготавливаю карту…</div></div>')
       :'<div class="result-head"><span>#</span><span>Место / событие</span><span>Источник</span><span>Район / город</span><span>Цена с дорогой</span><span>Дорога</span><span>Всего</span><span>Рейтинг</span><span>Атмосфера</span><span></span></div>'+(rows||'<div class="empty-state">По текущим фильтрам ничего не найдено.</div>'))+
     '</section></div>';
   shell(view,"search",true);
   document.body.classList.toggle("filter-overlay-open",state.filterDrawerOpen);
   const sort=document.querySelector("#result-sort"); if(sort) sort.value=state.resultSort;
-  if(state.resultView==="map"){
+  if(state.resultView==="map" && !state.filterDrawerOpen){
     setTimeout(async()=>{
       await buildLeafletMap("search-map",results,{maxGeocode:20});
       if(state.searchMapFocus){
