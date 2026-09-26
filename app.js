@@ -1067,13 +1067,18 @@ function renderDetail(){
         '<p class="detail-description">'+e(description)+'</p><div class="detail-actions">'+actions+'</div></div></div></section>'+
       '<div class="detail-lower"><section class="panel emotions-card"><div class="detail-section-title">Главное состояние и эмоции <span>?</span></div><div class="main-state-box"><b>'+e(item.main_state||"Главное состояние не указано")+'</b><small>'+e(item.parent_activity||item.primary_activity||"")+'</small></div>'+emotionMarkup(item)+'<h4>Атмосфера</h4><div class="detail-labels">'+tags.slice(1).map(t=>'<span class="badge blue">'+e(t)+'</span>').join("")+'</div></section>'+
         '<div class="detail-center-stack"><section class="panel pros-cons"><div><h3>👍 Почему стоит идти</h3>'+bulletText(why,"good")+'</div><div><h3>⚠ Что может не понравиться</h3>'+bulletText(downside,"bad")+'</div></section>'+
-          '<section class="panel route-card"><h3>📍 Как добраться</h3><div class="route-options">'+routeOption("На метро",districtFor(item,type),road)+routeOption("На авто","Маршрут рядом","~ 35 мин")+routeOption("Общественный транспорт","Автобусы, электробусы",road)+'</div><div class="route-bottom">'+(mapUrl?'<a class="outline-btn" href="'+e(mapUrl)+'" target="_blank" rel="noopener noreferrer">⌖ Показать маршрут на карте</a>':'<button class="outline-btn" disabled>⌖ Показать маршрут на карте</button>')+'<div class="map-placeholder"><span>📍</span><b>'+e(title)+'</b></div></div></section></div>'+
+          '<section class="panel route-card"><h3>📍 Как добраться</h3><div class="route-options">'+routeOption("На метро",districtFor(item,type),road)+routeOption("На авто","Маршрут рядом","~ 35 мин")+routeOption("Общественный транспорт","Автобусы, электробусы",road)+'</div><div class="route-bottom">'+(mapUrl?'<a class="outline-btn" href="'+e(mapUrl)+'" target="_blank" rel="noopener noreferrer">⌖ Показать маршрут на карте</a>':'<button class="outline-btn" disabled>⌖ Показать маршрут на карте</button>')+'<div class="detail-map-wrap"><div id="detail-map" class="detail-map"></div><div class="map-status" data-map-status="detail-map">Подготавливаю карту…</div></div></div></section></div>'+
         '<aside class="detail-right-stack"><section class="panel detail-summary"><h3>Краткая информация</h3>'+summaryRow("▣","Цена",money(price))+summaryRow("▣","С дорогой (примерно)",money(price))+summaryRow("◷","Время на месте",durationFor(item,type))+summaryRow("🚙","Время дороги",road)+summaryRow("◷","Всего времени",totalTime)+'<hr>'+summaryRow("☀","Лучше всего",item.best_window||item.time_of_day||"День / Вечер")+summaryRow("♟","Один / Вместе",item.social_format||"Для всех")+summaryRow("❉","Сезон",item.season||"Круглый год")+'</section>'+
           '<section class="panel detail-history-side"><div class="side-head"><h3>▣ История посещений</h3><button class="link-btn" data-nav="#/history">Все посещения →</button></div>'+detailVisitHistory(visitHistory)+'</section>'+
           '<section class="panel repeat-card"><h3>↻ Повторить?</h3><strong>'+e(repeatText)+'</strong><p>'+e(lastVisit?.conclusion||"Решение появится после подтверждённого Visit.")+'</p></section></aside>'+
       '</div></div></div>';
 
   shell(view,"home",true);
+  if(itemPlace(item)) setTimeout(()=>buildLeafletMap("detail-map",[{type,item}],{maxGeocode:1}),0);
+  else {
+    const status=document.querySelector('[data-map-status="detail-map"]');
+    if(status) status.textContent="Для этой карточки пока нет связанного Place с координатами.";
+  }
 }
 function summaryRow(ic,label,value){
   return '<div class="summary-row"><span class="summary-ic">'+ic+'</span><span>'+e(label)+'</span><b>'+e(value)+'</b></div>';
